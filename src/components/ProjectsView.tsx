@@ -3,11 +3,11 @@ import {
   Archive,
   ArrowDown,
   ArrowUp,
+  ChevronDown,
   ExternalLink,
   FolderKanban,
   PauseCircle,
   Pencil,
-  Play,
   RotateCcw,
   Search,
 } from "lucide-react";
@@ -24,11 +24,8 @@ type Props = {
   onEdit: (project: Project) => void;
   onStatus: (project: Project, status: ProjectStatus) => Promise<void>;
   onMove: (project: Project, direction: -1 | 1) => Promise<void>;
-  onStart: (project: Project) => void;
-  onReport: (project: Project) => void;
 };
-
-const statusLabel: Record<ProjectStatus, string> = {
+const labels: Record<ProjectStatus, string> = {
   planned: "Planned",
   active: "Active",
   on_hold: "On hold",
@@ -42,11 +39,10 @@ export default function ProjectsView({
   onEdit,
   onStatus,
   onMove,
-  onStart,
-  onReport,
 }: Props) {
   const [filter, setFilter] = useState<"active" | "archived" | "all">("active");
   const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const normalized = useMemo(() => normalizeReportLogs(logs), [logs]);
   const rows = useMemo(
     () =>
@@ -64,12 +60,12 @@ export default function ProjectsView({
       }),
     [projects, filter, search],
   );
-  const totals = (id: string) =>
+  const total = (id: string) =>
     normalized
       .filter((log) => log.projectId === id)
       .reduce((sum, log) => sum + log.durationMinutes, 0);
-  const recent = (id: string) =>
-    normalized.filter((log) => log.projectId === id).slice(0, 1)[0];
+  const latest = (id: string) =>
+    normalized.filter((log) => log.projectId === id)[0];
   return (
     <section className="projects-workspace">
       <div className="report-toolbar">
@@ -77,7 +73,8 @@ export default function ProjectsView({
           <span className="eyebrow">WORKSPACE</span>
           <h2>Projects</h2>
           <p className="muted">
-            Manage project details, targets, status, and work history.
+            Open a project to view and manage its details. Your Focus Timer
+            stays in Overview.
           </p>
         </div>
         <div className="project-count">{projects.length} total</div>
@@ -109,131 +106,136 @@ export default function ProjectsView({
           ))}
         </div>
       </div>
-      <div className="project-manager-grid">
+      <div className="project-accordion">
         {rows.map((project, index) => {
-          const status =
-            project.status || (project.active ? "active" : "archived");
-          const total = totals(project.id);
-          const latest = recent(project.id);
+          const status = (project.status ||
+            (project.active ? "active" : "archived")) as ProjectStatus;
           const archived = status === "archived";
+          const open = expandedId === project.id;
           return (
             <article
-              className={`project-manager-card ${archived ? "is-archived" : ""}`}
+              className={`project-accordion-item ${archived ? "is-archived" : ""} ${open ? "is-open" : ""}`}
               key={project.id}
             >
-              <div className="project-manager-head">
-                <div className="project-name">
+              <button
+                type="button"
+                className="project-accordion-trigger"
+                onClick={() => setExpandedId(open ? null : project.id)}
+                aria-expanded={open}
+              >
+                <span className="project-name">
                   <i style={{ background: project.color }} />
-                  <div>
-                    <h3>{project.name}</h3>
-                    <span>{project.clientName || "Personal project"}</span>
-                  </div>
-                </div>
-                <span className={`status-pill ${status}`}>
-                  {statusLabel[status]}
+                  <span>
+                    <b>{project.name}</b>
+                    <small>{project.clientName || "Personal project"}</small>
+                  </span>
                 </span>
-              </div>
-              {project.description && (
-                <p className="project-description">{project.description}</p>
-              )}
-              <div className="project-manager-stats">
-                <div>
-                  <span>Daily target</span>
-                  <b>{formatMinutes(project.targetMinutes)}</b>
-                </div>
-                <div>
-                  <span>Tracked</span>
-                  <b>{formatMinutes(total)}</b>
-                </div>
-                <div>
-                  <span>Priority</span>
-                  <b className={`priority ${project.priority || "medium"}`}>
-                    {project.priority || "medium"}
-                  </b>
-                </div>
-              </div>
-              <div className="project-meta">
-                {project.deadlineDate && (
-                  <span>Due {project.deadlineDate}</span>
-                )}
-                {latest && <span>Latest: {latest.date}</span>}
-              </div>
-              <div className="project-manager-actions">
-                <button className="outline-btn" onClick={() => onEdit(project)}>
-                  <Pencil size={14} /> Edit
-                </button>
-                {!archived && (
-                  <button
-                    className="start-btn"
-                    disabled={status !== "active"}
-                    onClick={() => onStart(project)}
-                  >
-                    <Play size={14} /> Start
-                  </button>
-                )}
-                <button
-                  className="outline-btn"
-                  onClick={() => onReport(project)}
-                >
-                  Report
-                </button>
-                {project.referenceUrl && (
-                  <a
-                    className="icon-btn"
-                    href={project.referenceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Open reference link"
-                  >
-                    <ExternalLink size={15} />
-                  </a>
-                )}
-              </div>
-              <div className="project-lifecycle">
-                <button
-                  className="text-btn"
-                  disabled={index === 0}
-                  onClick={() => void onMove(project, -1)}
-                >
-                  <ArrowUp size={14} /> Move up
-                </button>
-                <button
-                  className="text-btn"
-                  disabled={index === rows.length - 1}
-                  onClick={() => void onMove(project, 1)}
-                >
-                  <ArrowDown size={14} /> Move down
-                </button>
-                {archived ? (
-                  <button
-                    className="text-btn"
-                    onClick={() => void onStatus(project, "active")}
-                  >
-                    <RotateCcw size={14} /> Restore
-                  </button>
-                ) : (
-                  <>
+                <span className="project-accordion-summary">
+                  <b>{formatMinutes(total(project.id))}</b>
+                  <small>tracked</small>
+                </span>
+                <span className={`status-pill ${status}`}>
+                  {labels[status]}
+                </span>
+                <ChevronDown size={18} className={open ? "chevron-open" : ""} />
+              </button>
+              {open && (
+                <div className="project-accordion-detail">
+                  <div className="project-manager-stats">
+                    <div>
+                      <span>Daily target</span>
+                      <b>{formatMinutes(project.targetMinutes)}</b>
+                    </div>
+                    <div>
+                      <span>Total tracked</span>
+                      <b>{formatMinutes(total(project.id))}</b>
+                    </div>
+                    <div>
+                      <span>Priority</span>
+                      <b className={`priority ${project.priority || "medium"}`}>
+                        {project.priority || "medium"}
+                      </b>
+                    </div>
+                  </div>
+                  {project.description && (
+                    <p className="project-description">{project.description}</p>
+                  )}
+                  <div className="project-meta">
+                    {project.startDate && (
+                      <span>Started {project.startDate}</span>
+                    )}
+                    {project.deadlineDate && (
+                      <span>Due {project.deadlineDate}</span>
+                    )}
+                    {latest(project.id) && (
+                      <span>Latest session: {latest(project.id)?.date}</span>
+                    )}
+                  </div>
+                  <div className="project-manager-actions">
+                    <button
+                      className="outline-btn"
+                      onClick={() => onEdit(project)}
+                    >
+                      <Pencil size={14} /> Edit details
+                    </button>
+                    {project.referenceUrl && (
+                      <a
+                        className="outline-btn"
+                        href={project.referenceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <ExternalLink size={14} /> Open link
+                      </a>
+                    )}
+                  </div>
+                  <div className="project-lifecycle">
                     <button
                       className="text-btn"
-                      onClick={() =>
-                        void onStatus(
-                          project,
-                          status === "on_hold" ? "active" : "on_hold",
-                        )
-                      }
+                      disabled={index === 0}
+                      onClick={() => void onMove(project, -1)}
                     >
-                      <PauseCircle size={14} />{" "}
-                      {status === "on_hold" ? "Resume" : "On hold"}
+                      <ArrowUp size={14} /> Move up
                     </button>
                     <button
-                      className="text-btn danger-text"
-                      onClick={() => void onStatus(project, "archived")}
+                      className="text-btn"
+                      disabled={index === rows.length - 1}
+                      onClick={() => void onMove(project, 1)}
                     >
-                      <Archive size={14} /> Archive
+                      <ArrowDown size={14} /> Move down
                     </button>
-                  </>
-                )}
-              </div>
+                    {archived ? (
+                      <button
+                        className="text-btn"
+                        onClick={() => void onStatus(project, "active")}
+                      >
+                        <RotateCcw size={14} /> Restore
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          className="text-btn"
+                          onClick={() =>
+                            void onStatus(
+                              project,
+                              status === "on_hold" ? "active" : "on_hold",
+                            )
+                          }
+                        >
+                          <PauseCircle size={14} />{" "}
+                          {status === "on_hold" ? "Resume" : "On hold"}
+                        </button>
+                        <button
+                          className="text-btn danger-text"
+                          onClick={() => void onStatus(project, "archived")}
+                        >
+                          <Archive size={14} /> Archive
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </article>
           );
         })}

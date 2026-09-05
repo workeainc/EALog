@@ -855,6 +855,61 @@ td {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
 }
+.project-accordion {
+  display: grid;
+  gap: 10px;
+}
+.project-accordion-item {
+  background: #fff;
+  border: 1px solid #e8e5ef;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.project-accordion-item.is-archived {
+  opacity: 0.72;
+}
+.project-accordion-trigger {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 17px;
+  cursor: pointer;
+  text-align: left;
+  color: #302b44;
+}
+.project-accordion-trigger:hover,
+.project-accordion-item.is-open .project-accordion-trigger {
+  background: #faf9fd;
+}
+.project-accordion-trigger .project-name {
+  flex: 1;
+}
+.project-accordion-trigger .project-name small,
+.project-accordion-summary small {
+  display: block;
+  color: #827b92;
+  font-size: 12px;
+  margin-top: 3px;
+}
+.project-accordion-summary {
+  text-align: right;
+  min-width: 76px;
+}
+.project-accordion-summary b {
+  font-size: 13px;
+}
+.chevron-open {
+  transform: rotate(180deg);
+}
+.project-accordion-detail {
+  border-top: 1px solid #eeeaf3;
+  padding: 16px 17px;
+  display: grid;
+  gap: 13px;
+}
 .project-manager-card {
   background: #fff;
   border: 1px solid #e8e5ef;

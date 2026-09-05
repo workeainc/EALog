@@ -995,14 +995,6 @@ export default function App() {
             }}
             onStatus={changeProjectStatus}
             onMove={moveProject}
-            onStart={(project) => {
-              setSelectedId(project.id);
-              setView("overview");
-            }}
-            onReport={(project) => {
-              setSelectedId(project.id);
-              setView("reports");
-            }}
           />
         ) : view === "reports" ? (
           <ReportsView
