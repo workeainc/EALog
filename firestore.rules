@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Every document used by the app is scoped below its authenticated owner.
+    // This also denies access to any top-level collections not explicitly allowed.
+    match /users/{userId} {
+      allow read, create, update, delete: if isOwner(userId);
+
+      match /projects/{projectId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
+
+      match /work_logs/{logId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
+
+      match /active_session/{sessionId} {
+        allow read, create, delete: if isOwner(userId);
+        // Only the current app's explicit Pause action may introduce pausedAt.
+        // This blocks stale clients that contained the old automatic-pause bug.
+        allow update: if isOwner(userId)
+          && (!(request.resource.data.pausedAt != null && resource.data.pausedAt == null)
+            || request.resource.data.pauseReason == 'manual');
+      }
+
+      match /settings/{settingId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
+    }
+  }
+}
