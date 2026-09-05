@@ -37,4 +37,4 @@ Do not deploy before plans 001–003 pass their verification gates. PDF sharing 
 | 005 | DONE | Offline cache, IndexedDB outbox, reconnect replay, conflict detection, sync status UI, and PWA shell deployed. |
 | 006 | PARTIAL | Professional profile and branded PDF settings implemented/deployed; secure links and scheduled delivery remain pending trusted Functions/email-provider setup. |
 | 007 | DONE | Project breakdown model, enriched branded PDF summary, and responsive report breakdown UI deployed. |
-| 008 | TODO | Projects workspace plan ready for implementation. |
+| 008 | DONE | Dedicated Projects workspace, metadata editor, search/filter, lifecycle actions, ordering, and project shortcuts deployed. |
