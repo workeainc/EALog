@@ -12,6 +12,7 @@ import {
   FolderKanban,
   LayoutDashboard,
   ListTodo,
+  StickyNote,
   Menu,
   Play,
   Plus,
@@ -30,6 +31,7 @@ import ReportsView from "./components/ReportsView";
 import ProfileSettings from "./components/ProfileSettings";
 import ProjectsView from "./components/ProjectsView";
 import TodosView from "./components/TodosView";
+import NotesView from "./components/NotesView";
 import { summarizeNote } from "./lib/summarize";
 import {
   aggregateReportRows,
@@ -42,6 +44,7 @@ import {
   createProjectId,
   type Project,
   type Todo,
+  type ProjectNote,
   type TodoPriority,
   type TrackerProfile,
 } from "./types/tracker";
@@ -125,7 +128,7 @@ const DEMO_LOGS: ReportLog[] = [
 const mins = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}h ${Math.max(0, minutes) % 60 ? `${Math.max(0, minutes) % 60}m` : ""}`;
 type View =
-  "overview" | "projects" | "reports" | "sessions" | "todos" | "settings";
+  "overview" | "projects" | "reports" | "sessions" | "todos" | "notes" | "settings";
 type SyncState = {
   online: boolean;
   pending: number;
@@ -171,6 +174,8 @@ export default function App() {
     firebaseConfigured ? [] : DEMO_LOGS,
   );
   const [todos, setTodos] = useState<Todo[]>([]);
+  const [notes, setNotes] = useState<ProjectNote[]>([]);
+  const [notesProjectId, setNotesProjectId] = useState<string | null>(null);
   const [sessionFilter, setSessionFilter] = useState<
     "last2" | "last7" | "last30" | "custom"
   >(
@@ -221,13 +226,15 @@ export default function App() {
     let offActive: () => void = () => {};
     let offProjects: () => void = () => {};
     let offLogs: () => void = () => {};
+    let offNotes: () => void = () => {};
     const todoUnsubscribers: Array<() => void> = [];
     (async () => {
       try {
-        const [{ auth }, service, todoService, authSdk] = await Promise.all([
+        const [{ auth }, service, todoService, noteService, authSdk] = await Promise.all([
           import("./lib/firebase"),
           import("./lib/tracker-service"),
           import("./lib/todo-service"),
+          import("./lib/note-service"),
           import("firebase/auth"),
         ]);
         // Restore the persisted browser session before deciding whether
@@ -331,6 +338,7 @@ export default function App() {
             );
           },
         );
+        offNotes = noteService.subscribeToNotes(user.uid, setNotes);
         const todoFrom = new Date();
         todoFrom.setDate(todoFrom.getDate() - 90);
         const todoTo = new Date();
@@ -421,6 +429,7 @@ export default function App() {
       offActive();
       offProjects();
       offLogs();
+      offNotes();
       todoUnsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [firebaseConfigured]);
@@ -1096,6 +1105,19 @@ export default function App() {
       return (await import("./lib/todo-service")).deleteTodo(uid, todo.id);
     setTodos((items) => items.filter((item) => item.id !== todo.id));
   };
+  const createNote = async (input: { projectId: string; title: string; content: string; type: any; pinned: boolean }) => {
+    if (uid) return (await import("./lib/note-service")).createNote(uid, input);
+  };
+  const updateNote = async (note: ProjectNote, patch: any) => {
+    if (uid) return (await import("./lib/note-service")).updateNote(uid, note.id, patch);
+  };
+  const deleteNote = async (note: ProjectNote) => {
+    if (!window.confirm(`Delete “${note.title}”?`)) return;
+    if (uid) return (await import("./lib/note-service")).deleteNote(uid, note.id);
+  };
+  const convertNote = async (note: ProjectNote, input: { title: string; priority: TodoPriority; plannedDateString: string }) => {
+    if (uid) return (await import("./lib/note-service")).convertNoteToTask(uid, note, input).then(() => undefined);
+  };
   const projectColor = (id: string) =>
     projects.find((project) => project.id === id)?.color || "#8b78e8";
   const signIn = async () => {
@@ -1217,6 +1239,10 @@ export default function App() {
             <ListTodo size={18} />
             Tasks
           </a>
+          <a className={view === "notes" ? "active" : ""} onClick={() => { setNotesProjectId(null); setView("notes"); setMobileNav(false); }}>
+            <StickyNote size={18} />
+            Notes
+          </a>
           <div className={`sidebar-projects ${projectNavOpen ? "open" : ""}`}>
             <button
               className={view === "projects" ? "active" : ""}
@@ -1288,7 +1314,7 @@ export default function App() {
         </div>
       </aside>
       <main className="main">
-        {view !== "sessions" && view !== "projects" && view !== "todos" && <header>
+        {view !== "sessions" && view !== "projects" && view !== "todos" && view !== "notes" && <header>
           <button className="menu-button" onClick={() => setMobileNav(true)}>
             <Menu />
           </button>
@@ -1322,6 +1348,7 @@ export default function App() {
             projects={projects}
             logs={monthLogs}
             todos={todos}
+            notes={notes}
             selectedProjectId={projectDashboardId}
             onSelectProject={setProjectDashboardId}
             onEdit={(project) => {
@@ -1333,6 +1360,7 @@ export default function App() {
               setShowAddProject(true);
             }}
             onStatus={changeProjectStatus}
+            onOpenNotes={(projectId) => { setNotesProjectId(projectId); setView("notes"); }}
           />
         ) : view === "todos" ? (
           <TodosView
@@ -1345,6 +1373,8 @@ export default function App() {
             onUpdate={updateTodo}
             onDelete={removeTodo}
           />
+        ) : view === "notes" ? (
+          <NotesView notes={notes} projects={projects} initialProjectId={notesProjectId} onCreate={createNote} onUpdate={updateNote} onDelete={deleteNote} onConvert={convertNote} />
         ) : view === "reports" ? (
           <ReportsView
             projects={projects}

@@ -23,17 +23,19 @@ import {
 } from "../lib/reports";
 import { getMonthPlan, localDateKey } from "../lib/project-schedule";
 import { buildTodoDayStats, todosForProjectOnDate } from "../lib/todos";
-import type { Project, ProjectStatus, Todo } from "../types/tracker";
+import type { Project, ProjectNote, ProjectStatus, Todo } from "../types/tracker";
 
 type Props = {
   projects: Project[];
   logs: ReportLog[];
   todos: Todo[];
+  notes?: ProjectNote[];
   selectedProjectId?: string | null;
   onSelectProject: (id: string | null) => void;
   onEdit: (project: Project) => void;
   onCreate: () => void;
   onStatus: (project: Project, status: ProjectStatus) => Promise<void>;
+  onOpenNotes?: (projectId: string) => void;
 };
 const labels: Record<ProjectStatus, string> = {
   planned: "Planned",
@@ -56,11 +58,13 @@ export default function ProjectsView({
   projects,
   logs,
   todos,
+  notes = [],
   selectedProjectId,
   onSelectProject,
   onEdit,
   onCreate,
   onStatus,
+  onOpenNotes,
 }: Props) {
   const [filter, setFilter] = useState<ProjectStatus | "all">("active");
   const [search, setSearch] = useState("");
@@ -132,6 +136,7 @@ export default function ProjectsView({
       0,
     );
     const todayProjectTodos = todosForProjectOnDate(todos, selected.id, today);
+    const projectNotes = notes.filter((note) => note.projectId === selected.id && note.state === "active").sort((a, b) => Number(b.pinned) - Number(a.pinned));
     const todayTodoStats = buildTodoDayStats(todayProjectTodos, today);
     const selectedDayProjectTodos = selectedDay
       ? todosForProjectOnDate(todos, selected.id, selectedDay)
@@ -361,6 +366,12 @@ export default function ProjectsView({
                 <span>{todo.title}</span>
               </div>
             ))}
+          </article>
+          <article className="project-dashboard-card project-notes-summary">
+            <div className="project-notes-head"><div><span className="eyebrow">NOTES</span><h3>{projectNotes.filter((note) => note.pinned).length} pinned · {projectNotes.length} active</h3></div><button className="text-btn" onClick={() => onOpenNotes?.(selected.id)}>View all notes →</button></div>
+            {projectNotes.slice(0, 3).map((note) => <div className="project-note-line" key={note.id}><i style={{ background: selected.color }} /><span><b>{note.title}</b><small>{note.type}{note.pinned ? " · Pinned" : ""}</small></span></div>)}
+            {!projectNotes.length && <p className="muted">No notes for this project yet.</p>}
+            <button className="text-btn" onClick={() => onOpenNotes?.(selected.id)}>+ Add note</button>
           </article>
           <article className="project-dashboard-card">
             <h3>Activity by day</h3>
