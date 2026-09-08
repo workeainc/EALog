@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTodoDayStats, sortTodos } from "./todos";
+import { buildTodoDayStats, mergeTodoStreams, sortTodos } from "./todos";
 import { toDateString } from "./date";
 import type { Todo } from "../types/tracker";
 
@@ -67,5 +67,26 @@ describe("Todo statistics", () => {
 
   it("rejects invalid dates rather than creating an invalid calendar key", () => {
     expect(() => toDateString(new Date("not a date"))).toThrow("Invalid date");
+  });
+
+  it("merges planned, completion, and overdue streams without duplicates", () => {
+    const sameDay = task({
+      id: "same-day",
+      status: "completed",
+      completedDateString: "2026-09-09",
+    });
+    const late = task({
+      id: "late",
+      plannedDateString: "2026-09-05",
+      status: "completed",
+      completedDateString: "2026-09-09",
+    });
+    const overdue = task({ id: "overdue", plannedDateString: "2026-09-05" });
+    const merged = mergeTodoStreams([sameDay], [overdue], [sameDay, late]);
+    expect(merged.map((todo) => todo.id).sort()).toEqual([
+      "late",
+      "overdue",
+      "same-day",
+    ]);
   });
 });

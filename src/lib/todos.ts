@@ -14,6 +14,22 @@ export const sortTodos = (todos: Todo[]) =>
       a.title.localeCompare(b.title),
   );
 
+/** Merge independent Firestore query streams without rendering a Todo twice. */
+export const mergeTodoStreams = (...streams: Todo[][]): Todo[] => {
+  const byId = new Map<string, Todo>();
+  for (const stream of streams) {
+    for (const todo of stream) {
+      const previous = byId.get(todo.id);
+      byId.set(todo.id, {
+        ...previous,
+        ...todo,
+        pendingSync: Boolean(previous?.pendingSync || todo.pendingSync),
+      });
+    }
+  }
+  return [...byId.values()];
+};
+
 export type TodoDayStats = {
   planned: number;
   completedFromPlan: number;

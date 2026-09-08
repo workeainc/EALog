@@ -46,7 +46,7 @@ import {
   nextDateKey,
   scheduleProjectChange,
 } from "./lib/project-schedule";
-import { buildTodoDayStats } from "./lib/todos";
+import { buildTodoDayStats, mergeTodoStreams } from "./lib/todos";
 
 const DEMO_PROJECTS: Project[] = [
   {
@@ -324,13 +324,10 @@ export default function App() {
         const publishTodos = () => {
           if (!disposed)
             setTodos(
-              [
-                ...plannedTodos.values(),
-                ...overdueTodos.values(),
-                ...completedTodos.values(),
-              ].filter(
-                (todo, index, items) =>
-                  items.findIndex((item) => item.id === todo.id) === index,
+              mergeTodoStreams(
+                [...plannedTodos.values()],
+                [...overdueTodos.values()],
+                [...completedTodos.values()],
               ),
             );
         };

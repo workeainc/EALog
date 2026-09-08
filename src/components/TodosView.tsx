@@ -116,7 +116,7 @@ export default function TodosView({
           <b>
             {stats.completedFromPlan}/{stats.planned}
           </b>
-          <small>plan complete</small>
+          <small>plan completed</small>
         </div>
       </div>
       <div className="todo-date-nav" aria-label="Task date">
@@ -181,7 +181,7 @@ export default function TodosView({
               <h3>{date === today ? "Today" : readableDate(date)}</h3>
               <p>
                 {stats.open} remaining · {stats.completionPercent}% plan
-                complete · {stats.completedOnDate} completed today
+                completed · {stats.completedOnDate} completed on this day
               </p>
             </div>
             <span>{stats.planned} planned</span>
