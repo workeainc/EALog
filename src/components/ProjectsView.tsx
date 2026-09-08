@@ -8,7 +8,7 @@ import {
   RotateCcw,
   Search,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   formatMinutes,
   normalizeReportLogs,
@@ -44,6 +44,10 @@ export default function ProjectsView({
 }: Props) {
   const [filter, setFilter] = useState<"active" | "archived" | "all">("active");
   const [search, setSearch] = useState("");
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  useEffect(() => {
+    setSelectedDay(null);
+  }, [selectedProjectId]);
   const sessions = useMemo(
     () =>
       normalizeReportLogs(logs).sort(
@@ -74,6 +78,13 @@ export default function ProjectsView({
       days[session.date] = entry;
       return days;
     }, {});
+    const selectedDaySessions = selectedDay
+      ? projectSessions.filter((session) => session.date === selectedDay)
+      : [];
+    const selectedDayMinutes = selectedDaySessions.reduce(
+      (sum, session) => sum + session.durationMinutes,
+      0,
+    );
     return (
       <section className="project-dashboard">
         <button
@@ -192,20 +203,73 @@ export default function ProjectsView({
                 {Object.entries(dailyActivity)
                   .sort(([a], [b]) => b.localeCompare(a))
                   .map(([day, activity]) => (
-                    <div key={day}>
+                    <button
+                      type="button"
+                      key={day}
+                      className={selectedDay === day ? "is-selected" : ""}
+                      onClick={() => setSelectedDay(day)}
+                      aria-expanded={selectedDay === day}
+                      aria-label={`Show ${activity.sessions} session${activity.sessions === 1 ? "" : "s"} for ${day}`}
+                    >
                       <span>{day}</span>
                       <b>{formatMinutes(activity.minutes)}</b>
                       <small>
                         {activity.sessions} session
                         {activity.sessions === 1 ? "" : "s"}
                       </small>
-                    </div>
+                    </button>
                   ))}
               </div>
             ) : (
               <p className="muted">
                 No completed sessions for this project yet.
               </p>
+            )}
+            {selectedDay && (
+              <section className="project-day-drilldown" aria-live="polite">
+                <div className="project-day-drilldown-head">
+                  <div>
+                    <span className="eyebrow">SESSION DETAILS</span>
+                    <h4>{selectedDay}</h4>
+                    <p>
+                      {formatMinutes(selectedDayMinutes)} across{" "}
+                      {selectedDaySessions.length} session
+                      {selectedDaySessions.length === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <button
+                    className="text-btn"
+                    type="button"
+                    onClick={() => setSelectedDay(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="project-session-list">
+                  {selectedDaySessions.map((session) => (
+                    <div
+                      key={
+                        session.id ||
+                        `${session.startTime.getTime()}-${session.notes}`
+                      }
+                    >
+                      <span>
+                        {session.startTime.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                        –
+                        {session.endTime.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <b>{formatMinutes(session.durationMinutes)}</b>
+                      <p>{session.notes || "No work note added."}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
           </article>
         </div>

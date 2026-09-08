@@ -1089,13 +1089,28 @@ td {
   display: grid;
   gap: 8px;
 }
-.project-day-list > div {
+.project-day-list > button {
   display: grid;
   grid-template-columns: 1fr auto auto;
   gap: 10px;
   align-items: center;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   padding: 10px 0;
   border-bottom: 1px solid #f0edf5;
+}
+.project-day-list > button:hover span,
+.project-day-list > button.is-selected span {
+  color: #5c49c0;
+}
+.project-day-list > button.is-selected {
+  background: #f7f4ff;
+  border-radius: 8px;
+  padding-inline: 9px;
 }
 .project-day-list span {
   color: #5f596f;
@@ -1107,6 +1122,29 @@ td {
   color: #817a90;
   min-width: 70px;
   text-align: right;
+}
+.project-day-drilldown {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #e5dfff;
+  border-radius: 12px;
+  background: #fcfbff;
+}
+.project-day-drilldown-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.project-day-drilldown h4 {
+  margin: 3px 0 2px;
+  color: #332d4d;
+}
+.project-day-drilldown p {
+  margin: 0;
+  color: #7e778d;
+  font-size: 13px;
 }
 @media (max-width: 640px) {
   .project-dashboard-hero,
