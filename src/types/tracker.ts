@@ -24,6 +24,8 @@ export interface Project {
   clientName?: string;
   status?: ProjectStatus;
   priority?: ProjectPriority;
+  /** Local calendar day when the project was created. */
+  createdDate?: string;
   startDate?: string;
   deadlineDate?: string;
   referenceUrl?: string;

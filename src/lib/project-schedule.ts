@@ -94,6 +94,7 @@ const planForDay = (schedule: ProjectScheduleEntry[], day: string) =>
 export type MonthPlan = {
   totalTargetMinutes: number;
   expectedMinutes: number;
+  expectedTargetDays: number;
   activeTargetDays: number;
   onHoldDays: number;
 };
@@ -122,6 +123,7 @@ export const getMonthPlan = (
       ];
   let totalTargetMinutes = 0;
   let expectedMinutes = 0;
+  let expectedTargetDays = 0;
   let activeTargetDays = 0;
   let onHoldDays = 0;
   const today = localDateKey(now);
@@ -133,10 +135,19 @@ export const getMonthPlan = (
     if (plan?.status === "active") {
       totalTargetMinutes += plan.targetMinutes;
       activeTargetDays += 1;
-      if (dateKey <= today) expectedMinutes += plan.targetMinutes;
+      if (dateKey <= today) {
+        expectedMinutes += plan.targetMinutes;
+        expectedTargetDays += 1;
+      }
     } else if (plan?.status === "on_hold") {
       onHoldDays += 1;
     }
   }
-  return { totalTargetMinutes, expectedMinutes, activeTargetDays, onHoldDays };
+  return {
+    totalTargetMinutes,
+    expectedMinutes,
+    expectedTargetDays,
+    activeTargetDays,
+    onHoldDays,
+  };
 };

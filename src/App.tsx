@@ -774,6 +774,7 @@ export default function App() {
       const baselineDate =
         startDate ||
         editingProject.startDate ||
+        editingProject.createdDate ||
         earliestLogDate ||
         localDateKey();
       const targetSchedule = scheduleProjectChange(editingProject, {
@@ -827,7 +828,11 @@ export default function App() {
           effectiveDate: nextDateKey(),
           targetMinutes: project.targetMinutes,
           status,
-          baselineDate: project.startDate || earliestLogDate || localDateKey(),
+          baselineDate:
+            project.startDate ||
+            project.createdDate ||
+            earliestLogDate ||
+            localDateKey(),
         }),
       });
     } catch (error: any) {

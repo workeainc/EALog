@@ -14,7 +14,7 @@ import {
   normalizeReportLogs,
   type ReportLog,
 } from "../lib/reports";
-import { getMonthPlan } from "../lib/project-schedule";
+import { getMonthPlan, localDateKey } from "../lib/project-schedule";
 import type { Project, ProjectStatus } from "../types/tracker";
 
 type Props = {
@@ -103,10 +103,16 @@ export default function ProjectsView({
     const monthlyMinutes = projectSessions
       .filter((session) => session.date.startsWith(monthPrefix))
       .reduce((sum, session) => sum + session.durationMinutes, 0);
+    const earliestSessionDate = [...projectSessions].sort((a, b) =>
+      a.date.localeCompare(b.date),
+    )[0]?.date;
     const monthPlan = getMonthPlan(
       selected,
       now,
-      selected.startDate || `${monthPrefix}-01`,
+      selected.startDate ||
+        selected.createdDate ||
+        earliestSessionDate ||
+        localDateKey(now),
     );
     const expectedMinutes = monthPlan.expectedMinutes;
     const monthTargetMinutes = monthPlan.totalTargetMinutes;
@@ -204,8 +210,9 @@ export default function ProjectsView({
           <div className="project-month-progress-foot">
             <span>
               Day {now.getDate()} of {daysInMonth} ·{" "}
-              {monthPlan.activeTargetDays} target day
-              {monthPlan.activeTargetDays === 1 ? "" : "s"}
+              {monthPlan.expectedTargetDays} target day
+              {monthPlan.expectedTargetDays === 1 ? "" : "s"} by today ·{" "}
+              {monthPlan.activeTargetDays} planned this month
               {monthPlan.onHoldDays ? ` · ${monthPlan.onHoldDays} on hold` : ""}
             </span>
             <b className={paceDifference >= 0 ? "ahead" : "behind"}>

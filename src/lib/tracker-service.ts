@@ -395,6 +395,7 @@ export function subscribeToProjects(
           priority: (["low", "medium", "high"].includes(value.priority)
             ? value.priority
             : "medium") as Project["priority"],
+          createdDate: isDateKey(value.createdDate) ? value.createdDate : "",
           startDate: typeof value.startDate === "string" ? value.startDate : "",
           deadlineDate:
             typeof value.deadlineDate === "string" ? value.deadlineDate : "",
@@ -434,6 +435,7 @@ export async function createProject(
     active: true,
     color: PROJECT_COLORS[sortOrder % PROJECT_COLORS.length],
     sortOrder,
+    createdDate: toDateString(new Date()),
     targetSchedule: [
       {
         effectiveDate: toDateString(new Date()),
