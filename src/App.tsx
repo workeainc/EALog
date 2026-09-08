@@ -46,7 +46,7 @@ import {
   nextDateKey,
   scheduleProjectChange,
 } from "./lib/project-schedule";
-import { buildTodoDayStats, mergeTodoStreams } from "./lib/todos";
+import { buildTodoDayStats, mergeTodoStreams, sortTodos } from "./lib/todos";
 
 const DEMO_PROJECTS: Project[] = [
   {
@@ -151,6 +151,8 @@ export default function App() {
   const [showNote, setShowNote] = useState(false);
   const [note, setNote] = useState("");
   const [summary, setSummary] = useState("");
+  const [sessionTodoIds, setSessionTodoIds] = useState<string[]>([]);
+  const [finishingSession, setFinishingSession] = useState(false);
   const [todayLogs, setTodayLogs] = useState<ReportLog[]>(
     firebaseConfigured ? [] : DEMO_LOGS,
   );
@@ -479,6 +481,16 @@ export default function App() {
   }, []);
 
   const selectedProject = projects.find((project) => project.id === selectedId);
+  const sessionOpenTodos = useMemo(
+    () =>
+      sortTodos(
+        todos.filter(
+          (todo) =>
+            todo.projectId === selectedId && todo.status === "open",
+        ),
+      ),
+    [todos, selectedId],
+  );
   const elapsed = startedAt
     ? accumulatedSeconds +
       (paused ? 0 : Math.max(0, Math.floor((now - startedAt) / 1000)))
@@ -646,10 +658,23 @@ export default function App() {
       setSyncError(error?.message || "Could not resume session.");
     }
   };
+  const openFinishModal = () => {
+    setSessionTodoIds([]);
+    setShowNote(true);
+  };
+  const closeFinishModal = () => {
+    if (finishingSession) return;
+    setShowNote(false);
+    setSessionTodoIds([]);
+  };
   const finish = async () => {
     if (!note.trim()) return;
     const concise = summary.trim() || summarizeNote(note);
+    const tasksToComplete = sessionOpenTodos.filter((todo) =>
+      sessionTodoIds.includes(todo.id),
+    );
     try {
+      setFinishingSession(true);
       setSyncError("");
       if (uid && tracker) {
         // The write is committed before stopSession resolves, but the
@@ -709,11 +734,29 @@ export default function App() {
         setStartedAt(null);
         setAccumulatedSeconds(0);
       }
+      if (tasksToComplete.length) {
+        const completionResults = await Promise.allSettled(
+          tasksToComplete.map((todo) => toggleTodo(todo, true)),
+        );
+        const failedCount = completionResults.filter(
+          (result) => result.status === "rejected",
+        ).length;
+        if (failedCount) {
+          setSyncError(
+            `Session was saved, but ${failedCount} selected task${
+              failedCount === 1 ? "" : "s"
+            } could not be completed. Please retry from Tasks.`,
+          );
+        }
+      }
       setNote("");
       setSummary("");
+      setSessionTodoIds([]);
       setShowNote(false);
     } catch (error: any) {
       setSyncError(error?.message || "Could not save session.");
+    } finally {
+      setFinishingSession(false);
     }
   };
   const addProject = async () => {
@@ -1475,7 +1518,7 @@ export default function App() {
                     )}
                     <button
                       className="stop-btn"
-                      onClick={() => setShowNote(true)}
+                      onClick={openFinishModal}
                     >
                       <Square size={15} fill="currentColor" /> End session
                     </button>
@@ -1928,8 +1971,13 @@ export default function App() {
       )}
       {showNote && (
         <div className="modal-backdrop">
-          <div className="note-modal">
-            <button className="modal-close" onClick={() => setShowNote(false)}>
+          <div className="note-modal session-finish-modal">
+            <button
+              className="modal-close"
+              onClick={closeFinishModal}
+              disabled={finishingSession}
+              aria-label="Close end session dialog"
+            >
               <X size={18} />
             </button>
             <div className="modal-icon">
@@ -1969,19 +2017,55 @@ export default function App() {
                 />
               </label>
             )}
+            {sessionOpenTodos.length > 0 && (
+              <section className="session-todo-completion" aria-label="Project tasks">
+                <div className="session-todo-heading">
+                  <div>
+                    <span>OPEN TASKS FOR {selectedProject?.name || "THIS PROJECT"}</span>
+                    <p>Tick completed work to update your Todo list when this session is saved.</p>
+                  </div>
+                  <b>{sessionOpenTodos.length}</b>
+                </div>
+                <div className="session-todo-list">
+                  {sessionOpenTodos.map((todo) => {
+                    const checked = sessionTodoIds.includes(todo.id);
+                    return (
+                      <label key={todo.id} className={checked ? "selected" : ""}>
+                        <input
+                          type="checkbox"
+                          name="completed-session-todos"
+                          checked={checked}
+                          disabled={finishingSession}
+                          onChange={() =>
+                            setSessionTodoIds((ids) =>
+                              ids.includes(todo.id)
+                                ? ids.filter((id) => id !== todo.id)
+                                : [...ids, todo.id],
+                            )
+                          }
+                        />
+                        <span>{todo.title}</span>
+                        <small>{todo.priority}</small>
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
             <div className="modal-actions">
               <button
                 className="outline-btn"
-                onClick={() => setShowNote(false)}
+                onClick={closeFinishModal}
+                disabled={finishingSession}
               >
                 Cancel
               </button>
               <button
                 className="start-btn"
-                disabled={!note.trim()}
+                disabled={!note.trim() || finishingSession}
                 onClick={finish}
               >
-                Save session
+                {finishingSession ? "Saving…" : "Save session"}
               </button>
             </div>
           </div>
