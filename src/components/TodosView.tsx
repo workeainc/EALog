@@ -1,4 +1,4 @@
-import { AlertCircle, Bell, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, ListTodo, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertCircle, Bell, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, ListTodo, Move, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { buildTodoDayStats, sortTodos, todoDateKey } from "../lib/todos";
 import type { Project, Todo, TodoPriority } from "../types/tracker";
@@ -97,10 +97,8 @@ function TodoRow({ todo, project, onToggle, onMove, onDelete, onEdit, canMove, c
   const run = async (action: () => Promise<void>) => { setBusy(true); try { await action(); } finally { setBusy(false); } };
   const timelineLabel = todo.status === "completed" ? `Completed ${todo.completedDateString ? readableDate(todo.completedDateString) : ""}` : todo.plannedDateString === todoDateKey() ? "Today" : readableDate(todo.plannedDateString);
   return <div className={`todo-row ${compact ? "todo-row-compact" : ""} ${todo.status === "completed" ? "is-completed" : ""}`}>
-    <button type="button" className="todo-check" disabled={busy} onClick={() => void run(() => onToggle(todo, todo.status !== "completed"))} aria-label={todo.status === "completed" ? "Mark task open" : "Complete task"}>{todo.status === "completed" && <Check size={15} />}</button>
-    <div className="todo-copy"><b>{todo.title}</b><small><i style={{ background: project?.color || "#999" }} />{project?.name || (todo.projectId ? "Deleted project" : "Personal / Inbox")}<span className={`todo-priority ${todo.priority}`}>{todo.priority}</span><em>{timelineLabel}</em>{todo.pendingSync ? " · Syncing…" : ""}</small></div>
-    {canMove && <button className="text-btn todo-move" type="button" disabled={busy} onClick={() => void run(() => onMove(todo, todoDateKey()))}>Move to today</button>}
-    <div className="todo-row-actions"><button className="icon-btn todo-edit" type="button" disabled={busy} onClick={() => onEdit(todo)} aria-label="Edit task"><Pencil size={14} /></button><button className="icon-btn todo-delete" type="button" disabled={busy} onClick={() => void run(() => onDelete(todo))} aria-label="Delete task"><Trash2 size={15} /></button></div>
+    <div className="todo-row-content"><button type="button" className="todo-check" disabled={busy} onClick={() => void run(() => onToggle(todo, todo.status !== "completed"))} aria-label={todo.status === "completed" ? "Mark task open" : "Complete task"}>{todo.status === "completed" && <Check size={15} />}</button><div className="todo-copy"><b>{todo.title}</b>{!compact && <p>{todo.status === "completed" ? "Completed work item" : "Planned work item for this project"}</p>}<small><span className="todo-project-tag"><i style={{ background: project?.color || "#999" }} />{project?.name || (todo.projectId ? "Deleted project" : "Personal / Inbox")}</span><span className={`todo-priority ${todo.priority}`}>{todo.priority}</span><em><CalendarDays size={11} />{timelineLabel}</em>{todo.pendingSync ? " · Syncing…" : ""}</small></div></div>
+    <div className="todo-row-actions">{canMove && <button className="icon-btn todo-move" type="button" disabled={busy} onClick={() => void run(() => onMove(todo, todoDateKey()))} aria-label="Move task to today"><Move size={14} /></button>}<button className="icon-btn todo-edit" type="button" disabled={busy} onClick={() => onEdit(todo)} aria-label="Edit task"><Pencil size={14} /></button><button className="icon-btn todo-delete" type="button" disabled={busy} onClick={() => void run(() => onDelete(todo))} aria-label="Delete task"><Trash2 size={15} /></button></div>
   </div>;
 }
 
