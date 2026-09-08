@@ -795,6 +795,28 @@ export async function getRecentWorkLogs(
   );
 }
 
+/**
+ * Live source for the dashboard, Projects workspace, and activity charts.
+ * Firestore emits a local-cache snapshot first, so direct session edits and
+ * deletes update the UI without waiting for a page reload or server round trip.
+ */
+export function subscribeToWorkLogs(
+  uid: string,
+  callback: (logs: WorkLog[]) => void,
+  maxResults = 1_000,
+): Unsubscribe {
+  return onSnapshot(
+    query(logsRef(uid), orderBy("startTime", "desc"), limit(maxResults)),
+    { includeMetadataChanges: true },
+    (snapshot) =>
+      callback(
+        snapshot.docs.map(
+          (item) => ({ id: item.id, ...item.data() }) as WorkLog,
+        ),
+      ),
+  );
+}
+
 /** Update an owned completed work log. Timer/created timestamps are immutable. */
 export async function updateWorkLog(
   uid: string,

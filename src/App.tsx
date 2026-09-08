@@ -208,31 +208,12 @@ export default function App() {
   const [editError, setEditError] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const refreshLogs = useCallback(
-    async (service = tracker, userId = uid) => {
-      if (!firebaseConfigured || !service || !userId) return;
-      const today = getReportDateRange("today", new Date(), timezone);
-      const week = getReportDateRange("week", new Date(), timezone);
-      const month = getReportDateRange("month", new Date(), timezone);
-      const [daily, weekly, monthly, recent] = await Promise.all([
-        service.getWorkLogs(userId, today.from, today.to),
-        service.getWorkLogs(userId, week.from, week.to),
-        service.getWorkLogs(userId, month.from, month.to),
-        service.getRecentWorkLogs(userId),
-      ]);
-      setTodayLogs(daily);
-      setWeekLogs(weekly);
-      setMonthLogs(monthly);
-      setRecentLogs(recent);
-    },
-    [firebaseConfigured, tracker, uid, timezone],
-  );
-
   useEffect(() => {
     if (!firebaseConfigured) return;
     let disposed = false;
     let offActive: () => void = () => {};
     let offProjects: () => void = () => {};
+    let offLogs: () => void = () => {};
     const todoUnsubscribers: Array<() => void> = [];
     (async () => {
       try {
@@ -316,6 +297,33 @@ export default function App() {
             );
           },
         );
+        offLogs = service.subscribeToWorkLogs(
+          user.uid,
+          (items: ReportLog[]) => {
+            if (disposed) return;
+            const now = new Date();
+            const todayRange = getReportDateRange("today", now, timezone);
+            const weekRange = getReportDateRange("week", now, timezone);
+            const monthRange = getReportDateRange("month", now, timezone);
+            const inRange = (log: ReportLog, from: string, to: string) => {
+              const key = log.dateString || "";
+              return key >= from && key <= to;
+            };
+            // One listener is the source of truth. Every derived dashboard
+            // slice gets a fresh array, so React recalculates progress,
+            // sessions and charts immediately for local and remote writes.
+            setRecentLogs(items);
+            setTodayLogs(
+              items.filter((log) => inRange(log, todayRange.from, todayRange.to)),
+            );
+            setWeekLogs(
+              items.filter((log) => inRange(log, weekRange.from, weekRange.to)),
+            );
+            setMonthLogs(
+              items.filter((log) => inRange(log, monthRange.from, monthRange.to)),
+            );
+          },
+        );
         const todoFrom = new Date();
         todoFrom.setDate(todoFrom.getDate() - 90);
         const todoTo = new Date();
@@ -394,7 +402,6 @@ export default function App() {
             } else setRecoveryGap(false);
           },
         );
-        await refreshLogs(service, user.uid);
         setDataLoading(false);
       } catch (error: any) {
         if (!disposed)
@@ -406,6 +413,7 @@ export default function App() {
       disposed = true;
       offActive();
       offProjects();
+      offLogs();
       todoUnsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [firebaseConfigured]);
@@ -711,7 +719,6 @@ export default function App() {
         targetAlertedRef.current = false;
         setStartedAt(null);
         setAccumulatedSeconds(0);
-        void refreshLogs();
       } else {
         const start = new Date(startedAt || Date.now());
         const end = new Date();
@@ -826,7 +833,6 @@ export default function App() {
       setMonthLogs(replace);
       setRecentLogs(replace);
       setEditingLog(null);
-      void refreshLogs();
     } catch (error: any) {
       setEditError(error?.message || "Could not update session.");
     } finally {
@@ -846,7 +852,6 @@ export default function App() {
       setWeekLogs(remove);
       setMonthLogs(remove);
       setRecentLogs(remove);
-      void refreshLogs();
     } catch (error: any) {
       setSyncError(error?.message || "Could not delete session.");
     }
