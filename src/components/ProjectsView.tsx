@@ -34,6 +34,13 @@ const labels: Record<ProjectStatus, string> = {
 const statusFor = (project: Project) =>
   (project.status || (project.active ? "active" : "archived")) as ProjectStatus;
 
+const readableDate = (dateKey: string) =>
+  new Date(`${dateKey}T12:00:00`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
 export default function ProjectsView({
   projects,
   logs,
@@ -85,6 +92,27 @@ export default function ProjectsView({
       (sum, session) => sum + session.durationMinutes,
       0,
     );
+    const now = new Date();
+    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const daysInMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+    ).getDate();
+    const monthlyMinutes = projectSessions
+      .filter((session) => session.date.startsWith(monthPrefix))
+      .reduce((sum, session) => sum + session.durationMinutes, 0);
+    const expectedMinutes = selected.targetMinutes * now.getDate();
+    const monthTargetMinutes = selected.targetMinutes * daysInMonth;
+    const paceDifference = monthlyMinutes - expectedMinutes;
+    const progressPercent = Math.min(
+      100,
+      (monthlyMinutes / monthTargetMinutes) * 100,
+    );
+    const expectedPercent = Math.min(
+      100,
+      (expectedMinutes / monthTargetMinutes) * 100,
+    );
     return (
       <section className="project-dashboard">
         <button
@@ -133,6 +161,52 @@ export default function ProjectsView({
             </small>
           </div>
         </div>
+        <article className="project-month-progress">
+          <div className="project-month-progress-head">
+            <div>
+              <span className="eyebrow">MONTHLY PROGRESS</span>
+              <h3>
+                {now.toLocaleDateString("en-GB", {
+                  month: "long",
+                  year: "numeric",
+                })}
+              </h3>
+              <p>
+                {formatMinutes(monthlyMinutes)} tracked of{" "}
+                {formatMinutes(monthTargetMinutes)} monthly target
+              </p>
+            </div>
+            <div className="project-month-pace">
+              <b>{formatMinutes(expectedMinutes)}</b>
+              <small>expected by today</small>
+            </div>
+          </div>
+          <div
+            className="project-month-track"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={monthTargetMinutes}
+            aria-valuenow={monthlyMinutes}
+            aria-label={`${selected.name} monthly progress`}
+          >
+            <span style={{ width: `${progressPercent}%` }} />
+            <i
+              style={{ left: `${expectedPercent}%` }}
+              title="Expected by today"
+            />
+          </div>
+          <div className="project-month-progress-foot">
+            <span>
+              Day {now.getDate()} of {daysInMonth} ·{" "}
+              {formatMinutes(selected.targetMinutes)} daily target
+            </span>
+            <b className={paceDifference >= 0 ? "ahead" : "behind"}>
+              {paceDifference >= 0 ? "+" : "−"}
+              {formatMinutes(Math.abs(paceDifference))}{" "}
+              {paceDifference >= 0 ? "ahead of pace" : "behind pace"}
+            </b>
+          </div>
+        </article>
         <div className="project-dashboard-grid">
           <article className="project-dashboard-card">
             <h3>Project details</h3>
@@ -211,7 +285,7 @@ export default function ProjectsView({
                       aria-expanded={selectedDay === day}
                       aria-label={`Show ${activity.sessions} session${activity.sessions === 1 ? "" : "s"} for ${day}`}
                     >
-                      <span>{day}</span>
+                      <span>{readableDate(day)}</span>
                       <b>{formatMinutes(activity.minutes)}</b>
                       <small>
                         {activity.sessions} session
@@ -230,7 +304,7 @@ export default function ProjectsView({
                 <div className="project-day-drilldown-head">
                   <div>
                     <span className="eyebrow">SESSION DETAILS</span>
-                    <h4>{selectedDay}</h4>
+                    <h4>{readableDate(selectedDay)}</h4>
                     <p>
                       {formatMinutes(selectedDayMinutes)} across{" "}
                       {selectedDaySessions.length} session

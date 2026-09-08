@@ -1031,6 +1031,77 @@ td {
   margin: 5px 0;
   text-transform: capitalize;
 }
+.project-month-progress {
+  background: #fff;
+  border: 1px solid #e8e5ef;
+  border-radius: 14px;
+  padding: 18px;
+}
+.project-month-progress-head,
+.project-month-progress-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-end;
+}
+.project-month-progress h3 {
+  margin: 3px 0;
+  color: #322d4b;
+}
+.project-month-progress p,
+.project-month-progress small,
+.project-month-progress-foot span {
+  margin: 0;
+  color: #827b92;
+  font-size: 13px;
+}
+.project-month-pace {
+  text-align: right;
+}
+.project-month-pace b,
+.project-month-pace small {
+  display: block;
+}
+.project-month-pace b {
+  color: #5c49c0;
+  font-size: 18px;
+}
+.project-month-track {
+  position: relative;
+  height: 12px;
+  overflow: visible;
+  margin: 17px 0 10px;
+  border-radius: 999px;
+  background: #ece9f2;
+}
+.project-month-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8065ed, #5b44ca);
+  transition: width 220ms ease;
+}
+.project-month-track > i {
+  position: absolute;
+  top: -5px;
+  width: 3px;
+  height: 22px;
+  border-radius: 3px;
+  background: #f59d47;
+  transform: translateX(-1px);
+}
+.project-month-progress-foot {
+  align-items: center;
+}
+.project-month-progress-foot b {
+  font-size: 13px;
+}
+.project-month-progress-foot .ahead {
+  color: #15966d;
+}
+.project-month-progress-foot .behind {
+  color: #d65360;
+}
 .project-dashboard-grid {
   display: grid;
   grid-template-columns: 1fr 1.25fr;
@@ -1155,6 +1226,14 @@ td {
   }
   .project-dashboard-hero {
     gap: 12px;
+  }
+  .project-month-progress-head,
+  .project-month-progress-foot {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .project-month-pace {
+    text-align: left;
   }
   .project-session-list div {
     grid-template-columns: 1fr auto;
