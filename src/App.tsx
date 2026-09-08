@@ -1288,7 +1288,7 @@ export default function App() {
         </div>
       </aside>
       <main className="main">
-        {view !== "sessions" && <header>
+        {view !== "sessions" && view !== "projects" && <header>
           <button className="menu-button" onClick={() => setMobileNav(true)}>
             <Menu />
           </button>
@@ -1327,6 +1327,10 @@ export default function App() {
             onEdit={(project) => {
               setProjectSaveError("");
               setEditingProject(project);
+            }}
+            onCreate={() => {
+              setAddProjectError("");
+              setShowAddProject(true);
             }}
             onStatus={changeProjectStatus}
           />
