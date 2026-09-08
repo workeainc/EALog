@@ -10,6 +10,7 @@ import {
   Download,
   FolderKanban,
   LayoutDashboard,
+  ListTodo,
   Menu,
   Play,
   Plus,
@@ -24,6 +25,7 @@ import {
 import ReportsView from "./components/ReportsView";
 import ProfileSettings from "./components/ProfileSettings";
 import ProjectsView from "./components/ProjectsView";
+import TodosView from "./components/TodosView";
 import { summarizeNote } from "./lib/summarize";
 import {
   aggregateReportRows,
@@ -35,6 +37,8 @@ import {
 import {
   createProjectId,
   type Project,
+  type Todo,
+  type TodoPriority,
   type TrackerProfile,
 } from "./types/tracker";
 import {
@@ -42,6 +46,7 @@ import {
   nextDateKey,
   scheduleProjectChange,
 } from "./lib/project-schedule";
+import { buildTodoDayStats } from "./lib/todos";
 
 const DEMO_PROJECTS: Project[] = [
   {
@@ -115,7 +120,8 @@ const DEMO_LOGS: ReportLog[] = [
 });
 const mins = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}h ${Math.max(0, minutes) % 60 ? `${Math.max(0, minutes) % 60}m` : ""}`;
-type View = "overview" | "projects" | "reports" | "sessions" | "settings";
+type View =
+  "overview" | "projects" | "reports" | "sessions" | "todos" | "settings";
 type SyncState = {
   online: boolean;
   pending: number;
@@ -157,6 +163,7 @@ export default function App() {
   const [monthLogs, setMonthLogs] = useState<ReportLog[]>(
     firebaseConfigured ? [] : DEMO_LOGS,
   );
+  const [todos, setTodos] = useState<Todo[]>([]);
   const [sessionFilter, setSessionFilter] = useState<"last2" | "custom">(
     "last2",
   );
@@ -224,6 +231,7 @@ export default function App() {
     let disposed = false;
     let offActive: () => void = () => {};
     let offProjects: () => void = () => {};
+    let offTodos: () => void = () => {};
     (async () => {
       try {
         const [{ auth }, service, authSdk] = await Promise.all([
@@ -305,6 +313,18 @@ export default function App() {
             );
           },
         );
+        const todoFrom = new Date();
+        todoFrom.setDate(todoFrom.getDate() - 90);
+        const todoTo = new Date();
+        todoTo.setDate(todoTo.getDate() + 60);
+        offTodos = service.subscribeToTodosForRange(
+          user.uid,
+          localDateKey(todoFrom),
+          localDateKey(todoTo),
+          (items: Todo[]) => {
+            if (!disposed) setTodos(items);
+          },
+        );
         offActive = service.subscribeToActiveSession(
           user.uid,
           (active: any) => {
@@ -343,6 +363,7 @@ export default function App() {
       disposed = true;
       offActive();
       offProjects();
+      offTodos();
     };
   }, [firebaseConfigured]);
   useEffect(() => {
@@ -454,6 +475,10 @@ export default function App() {
   const average = todayAggregate.sessionCount
     ? Math.round(todayAggregate.totalMinutes / todayAggregate.sessionCount)
     : 0;
+  const todayTodoStats = useMemo(
+    () => buildTodoDayStats(todos, localDateKey()),
+    [todos],
+  );
   const weekAggregate = useMemo(
     () => aggregateReportRows(normalizeReportLogs(weekLogs), timezone),
     [weekLogs, timezone],
@@ -859,6 +884,52 @@ export default function App() {
   };
   const projectName = (id: string) =>
     projects.find((project) => project.id === id)?.name || id;
+  const createTodo = async (input: {
+    title: string;
+    projectId: string | null;
+    plannedDateString: string;
+    priority: TodoPriority;
+  }) => {
+    if (tracker && uid) return tracker.createTodo(uid, input);
+    const todo: Todo = {
+      id: crypto.randomUUID(),
+      ...input,
+      status: "open",
+      sortOrder: Date.now(),
+      completedAt: null,
+      completedDateString: null,
+    };
+    setTodos((items) => [...items, todo]);
+  };
+  const toggleTodo = async (todo: Todo, complete: boolean) => {
+    if (tracker && uid)
+      return tracker.toggleTodoComplete(uid, todo.id, complete);
+    setTodos((items) =>
+      items.map((item) =>
+        item.id === todo.id
+          ? {
+              ...item,
+              status: complete ? "completed" : "open",
+              completedDateString: complete ? localDateKey() : null,
+            }
+          : item,
+      ),
+    );
+  };
+  const moveTodo = async (todo: Todo, plannedDateString: string) => {
+    if (tracker && uid)
+      return tracker.updateTodo(uid, todo.id, { plannedDateString });
+    setTodos((items) =>
+      items.map((item) =>
+        item.id === todo.id ? { ...item, plannedDateString } : item,
+      ),
+    );
+  };
+  const removeTodo = async (todo: Todo) => {
+    if (!window.confirm(`Delete “${todo.title}”?`)) return;
+    if (tracker && uid) return tracker.deleteTodo(uid, todo.id);
+    setTodos((items) => items.filter((item) => item.id !== todo.id));
+  };
   const projectColor = (id: string) =>
     projects.find((project) => project.id === id)?.color || "#8b78e8";
   const signIn = async () => {
@@ -970,6 +1041,16 @@ export default function App() {
             <Clock3 size={18} />
             Sessions
           </a>
+          <a
+            className={view === "todos" ? "active" : ""}
+            onClick={() => {
+              setView("todos");
+              setMobileNav(false);
+            }}
+          >
+            <ListTodo size={18} />
+            Tasks
+          </a>
           <div className={`sidebar-projects ${projectNavOpen ? "open" : ""}`}>
             <button
               className={view === "projects" ? "active" : ""}
@@ -1074,6 +1155,7 @@ export default function App() {
           <ProjectsView
             projects={projects}
             logs={monthLogs}
+            todos={todos}
             selectedProjectId={projectDashboardId}
             onSelectProject={setProjectDashboardId}
             onEdit={(project) => {
@@ -1081,6 +1163,16 @@ export default function App() {
               setEditingProject(project);
             }}
             onStatus={changeProjectStatus}
+          />
+        ) : view === "todos" ? (
+          <TodosView
+            todos={todos}
+            projects={projects}
+            defaultProjectId={selectedId}
+            onCreate={createTodo}
+            onToggle={toggleTodo}
+            onMove={moveTodo}
+            onDelete={removeTodo}
           />
         ) : view === "reports" ? (
           <ReportsView
@@ -1209,6 +1301,27 @@ export default function App() {
                   </div>
                 </div>
               </div>
+              <button
+                className="stat-card todo-stat-card"
+                onClick={() => setView("todos")}
+              >
+                <div className="stat-icon purple">
+                  <ListTodo size={19} />
+                </div>
+                <div>
+                  <span>Today’s tasks</span>
+                  <strong>
+                    {todayTodoStats.completed}/{todayTodoStats.planned}
+                  </strong>
+                  <small>
+                    {todayTodoStats.open
+                      ? `${todayTodoStats.open} remaining`
+                      : todayTodoStats.planned
+                        ? "All completed"
+                        : "Plan your day"}
+                  </small>
+                </div>
+              </button>
               <div className="stat-card">
                 <div className="stat-icon green">
                   <BarChart3 size={19} />

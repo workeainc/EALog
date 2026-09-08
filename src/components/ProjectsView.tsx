@@ -15,11 +15,13 @@ import {
   type ReportLog,
 } from "../lib/reports";
 import { getMonthPlan, localDateKey } from "../lib/project-schedule";
-import type { Project, ProjectStatus } from "../types/tracker";
+import { buildTodoDayStats, todosForProjectOnDate } from "../lib/todos";
+import type { Project, ProjectStatus, Todo } from "../types/tracker";
 
 type Props = {
   projects: Project[];
   logs: ReportLog[];
+  todos: Todo[];
   selectedProjectId?: string | null;
   onSelectProject: (id: string | null) => void;
   onEdit: (project: Project) => void;
@@ -45,6 +47,7 @@ const readableDate = (dateKey: string) =>
 export default function ProjectsView({
   projects,
   logs,
+  todos,
   selectedProjectId,
   onSelectProject,
   onEdit,
@@ -73,19 +76,45 @@ export default function ProjectsView({
     const projectSessions = sessions.filter(
       (log) => log.projectId === selected.id,
     );
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateKey();
     const todayMinutes = projectSessions
       .filter((log) => log.date === today)
       .reduce((sum, log) => sum + log.durationMinutes, 0);
     const dailyActivity = projectSessions.reduce<
-      Record<string, { minutes: number; sessions: number }>
+      Record<
+        string,
+        {
+          minutes: number;
+          sessions: number;
+          planned: number;
+          completed: number;
+        }
+      >
     >((days, session) => {
-      const entry = days[session.date] || { minutes: 0, sessions: 0 };
+      const entry = days[session.date] || {
+        minutes: 0,
+        sessions: 0,
+        planned: 0,
+        completed: 0,
+      };
       entry.minutes += session.durationMinutes;
       entry.sessions += 1;
       days[session.date] = entry;
       return days;
     }, {});
+    todos
+      .filter((todo) => todo.projectId === selected.id)
+      .forEach((todo) => {
+        const entry = dailyActivity[todo.plannedDateString] || {
+          minutes: 0,
+          sessions: 0,
+          planned: 0,
+          completed: 0,
+        };
+        entry.planned += 1;
+        if (todo.status === "completed") entry.completed += 1;
+        dailyActivity[todo.plannedDateString] = entry;
+      });
     const selectedDaySessions = selectedDay
       ? projectSessions.filter((session) => session.date === selectedDay)
       : [];
@@ -93,6 +122,14 @@ export default function ProjectsView({
       (sum, session) => sum + session.durationMinutes,
       0,
     );
+    const todayProjectTodos = todosForProjectOnDate(todos, selected.id, today);
+    const todayTodoStats = buildTodoDayStats(todayProjectTodos, today);
+    const selectedDayProjectTodos = selectedDay
+      ? todosForProjectOnDate(todos, selected.id, selectedDay)
+      : [];
+    const selectedDayTodoStats = selectedDay
+      ? buildTodoDayStats(selectedDayProjectTodos, selectedDay)
+      : null;
     const now = new Date();
     const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const daysInMonth = new Date(
@@ -114,6 +151,14 @@ export default function ProjectsView({
         earliestSessionDate ||
         localDateKey(now),
     );
+    const monthTodos = todos.filter(
+      (todo) =>
+        todo.projectId === selected.id &&
+        todo.plannedDateString.startsWith(monthPrefix),
+    );
+    const monthCompletedTodos = monthTodos.filter(
+      (todo) => todo.status === "completed",
+    ).length;
     const expectedMinutes = monthPlan.expectedMinutes;
     const monthTargetMinutes = monthPlan.totalTargetMinutes;
     const paceDifference = monthlyMinutes - expectedMinutes;
@@ -145,6 +190,9 @@ export default function ProjectsView({
               {selected.clientName || "Personal project"}
               {selected.description ? ` · ${selected.description}` : ""}
             </p>
+            <small className="project-todo-month">
+              This month: {monthCompletedTodos}/{monthTodos.length} completed
+            </small>
           </div>
           <button className="outline-btn" onClick={() => onEdit(selected)}>
             <Pencil size={14} /> Edit project
@@ -285,6 +333,25 @@ export default function ProjectsView({
               )}
             </div>
           </article>
+          <article className="project-dashboard-card project-todo-summary">
+            <span className="eyebrow">TODAY’S TASKS</span>
+            <h3>
+              {todayTodoStats.completed}/{todayTodoStats.planned} completed
+            </h3>
+            <p className="muted">
+              {todayTodoStats.open
+                ? `${todayTodoStats.open} task${todayTodoStats.open === 1 ? "" : "s"} remaining`
+                : todayTodoStats.planned
+                  ? "All planned tasks completed"
+                  : "No tasks planned for today"}
+            </p>
+            {todayProjectTodos.slice(0, 3).map((todo) => (
+              <div className="project-todo-line" key={todo.id}>
+                <i className={todo.status === "completed" ? "done" : ""} />
+                <span>{todo.title}</span>
+              </div>
+            ))}
+          </article>
           <article className="project-dashboard-card">
             <h3>Activity by day</h3>
             {Object.keys(dailyActivity).length ? (
@@ -304,7 +371,8 @@ export default function ProjectsView({
                       <b>{formatMinutes(activity.minutes)}</b>
                       <small>
                         {activity.sessions} session
-                        {activity.sessions === 1 ? "" : "s"}
+                        {activity.sessions === 1 ? "" : "s"} ·{" "}
+                        {activity.completed}/{activity.planned} tasks
                       </small>
                     </button>
                   ))}
@@ -357,6 +425,27 @@ export default function ProjectsView({
                       <p>{session.notes || "No work note added."}</p>
                     </div>
                   ))}
+                </div>
+                <div className="project-day-todos">
+                  <h5>Tasks</h5>
+                  <p>
+                    {selectedDayTodoStats?.completed || 0}/
+                    {selectedDayTodoStats?.planned || 0} completed
+                  </p>
+                  {selectedDayProjectTodos.length ? (
+                    <ul>
+                      {selectedDayProjectTodos.map((todo) => (
+                        <li
+                          className={todo.status === "completed" ? "done" : ""}
+                          key={todo.id}
+                        >
+                          {todo.title}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No tasks were planned for this project on this day.</p>
+                  )}
                 </div>
               </section>
             )}

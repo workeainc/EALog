@@ -5,6 +5,24 @@ export type ProjectId = string;
 export type ProjectStatus =
   "planned" | "active" | "on_hold" | "completed" | "archived";
 export type ProjectPriority = "low" | "medium" | "high";
+export type TodoStatus = "open" | "completed";
+export type TodoPriority = "low" | "medium" | "high";
+
+export interface Todo {
+  id: string;
+  title: string;
+  projectId: ProjectId | null;
+  plannedDateString: string;
+  status: TodoStatus;
+  priority: TodoPriority;
+  sortOrder: number;
+  completedAt?: Timestamp | null;
+  completedDateString?: string | null;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  /** Local-only indicator supplied by the Firestore snapshot. */
+  pendingSync?: boolean;
+}
 
 /** A dated snapshot of a project's work plan. Values apply from the given day. */
 export interface ProjectScheduleEntry {

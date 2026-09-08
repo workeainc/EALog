@@ -11,6 +11,7 @@ import {
   orderBy,
   query,
   runTransaction,
+  serverTimestamp,
   setDoc,
   where,
   writeBatch,
@@ -35,6 +36,8 @@ import {
   type ProjectScheduleEntry,
   type ProjectStatus,
   type TrackerProfile,
+  type Todo,
+  type TodoPriority,
   type WorkLog,
 } from "../types/tracker";
 
@@ -57,6 +60,39 @@ const projectStatuses = [
 ] as const;
 const isDateKey = (value: unknown): value is string =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+const todoPriorities = ["low", "medium", "high"] as const;
+const cleanTodoTitle = (value: unknown) => {
+  const title =
+    typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+  if (!title || title.length > 240)
+    throw new Error("Task title must be between 1 and 240 characters.");
+  return title;
+};
+const asTodo = (
+  id: string,
+  value: Record<string, any>,
+  pendingSync = false,
+): Todo => ({
+  id,
+  title: cleanTodoTitle(value.title),
+  projectId:
+    typeof value.projectId === "string" && value.projectId
+      ? value.projectId
+      : null,
+  plannedDateString: isDateKey(value.plannedDateString)
+    ? value.plannedDateString
+    : toDateString(),
+  status: value.status === "completed" ? "completed" : "open",
+  priority: todoPriorities.includes(value.priority) ? value.priority : "medium",
+  sortOrder: Number.isFinite(value.sortOrder) ? Number(value.sortOrder) : 0,
+  completedAt: value.completedAt || null,
+  completedDateString: isDateKey(value.completedDateString)
+    ? value.completedDateString
+    : null,
+  createdAt: value.createdAt,
+  updatedAt: value.updatedAt,
+  pendingSync,
+});
 const cleanProjectSchedule = (value: unknown): ProjectScheduleEntry[] => {
   if (!Array.isArray(value)) return [];
   const byDate = new Map<string, ProjectScheduleEntry>();
@@ -82,6 +118,7 @@ const cleanProjectSchedule = (value: unknown): ProjectScheduleEntry[] => {
 const userRef = (uid: string) => doc(db, "users", uid);
 const projectsRef = (uid: string) => collection(userRef(uid), "projects");
 const logsRef = (uid: string) => collection(userRef(uid), "work_logs");
+const todosRef = (uid: string) => collection(userRef(uid), "todos");
 const activeSessionRef = (uid: string) =>
   doc(userRef(uid), "active_session", "current");
 const profileRef = (uid: string) => doc(userRef(uid), "settings", "profile");
@@ -446,6 +483,116 @@ export async function createProject(
   };
   await setDoc(doc(projectsRef(uid), id), { ...project, id: undefined });
   return project;
+}
+
+export function subscribeToTodosForRange(
+  uid: string,
+  from: string,
+  to: string,
+  callback: (todos: Todo[]) => void,
+): Unsubscribe {
+  return onSnapshot(
+    query(
+      todosRef(uid),
+      where("plannedDateString", ">=", from),
+      where("plannedDateString", "<=", to),
+      orderBy("plannedDateString", "asc"),
+      orderBy("sortOrder", "asc"),
+    ),
+    { includeMetadataChanges: true },
+    (snapshot) =>
+      callback(
+        snapshot.docs.map((item) =>
+          asTodo(item.id, item.data(), item.metadata.hasPendingWrites),
+        ),
+      ),
+  );
+}
+
+export async function createTodo(
+  uid: string,
+  input: {
+    title: string;
+    projectId?: ProjectId | null;
+    plannedDateString: string;
+    priority?: TodoPriority;
+    sortOrder?: number;
+  },
+): Promise<void> {
+  if (!isDateKey(input.plannedDateString))
+    throw new Error("Choose a valid planned date.");
+  const ref = doc(todosRef(uid));
+  await setDoc(ref, {
+    title: cleanTodoTitle(input.title),
+    projectId: input.projectId || null,
+    plannedDateString: input.plannedDateString,
+    status: "open",
+    priority: todoPriorities.includes(input.priority || "medium")
+      ? input.priority || "medium"
+      : "medium",
+    sortOrder: Number.isFinite(input.sortOrder)
+      ? Number(input.sortOrder)
+      : Date.now(),
+    completedAt: null,
+    completedDateString: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    lastMutationId: crypto.randomUUID(),
+  });
+}
+
+export async function updateTodo(
+  uid: string,
+  todoId: string,
+  patch: Partial<
+    Pick<
+      Todo,
+      "title" | "projectId" | "plannedDateString" | "priority" | "sortOrder"
+    >
+  >,
+): Promise<void> {
+  const data: Record<string, unknown> = {
+    updatedAt: serverTimestamp(),
+    lastMutationId: crypto.randomUUID(),
+  };
+  if (patch.title !== undefined) data.title = cleanTodoTitle(patch.title);
+  if (patch.projectId !== undefined) data.projectId = patch.projectId || null;
+  if (patch.plannedDateString !== undefined) {
+    if (!isDateKey(patch.plannedDateString))
+      throw new Error("Choose a valid planned date.");
+    data.plannedDateString = patch.plannedDateString;
+  }
+  if (patch.priority !== undefined) {
+    if (!todoPriorities.includes(patch.priority))
+      throw new Error("Choose a valid priority.");
+    data.priority = patch.priority;
+  }
+  if (patch.sortOrder !== undefined && Number.isFinite(patch.sortOrder))
+    data.sortOrder = patch.sortOrder;
+  await setDoc(doc(todosRef(uid), todoId), data, { merge: true });
+}
+
+export async function toggleTodoComplete(
+  uid: string,
+  todoId: string,
+  completed: boolean,
+  now = new Date(),
+): Promise<void> {
+  await setDoc(
+    doc(todosRef(uid), todoId),
+    {
+      status: completed ? "completed" : "open",
+      completedAt: completed ? serverTimestamp() : null,
+      completedDateString: completed ? toDateString(now) : null,
+      updatedAt: serverTimestamp(),
+      lastMutationId: crypto.randomUUID(),
+    },
+    { merge: true },
+  );
+}
+
+export async function deleteTodo(uid: string, todoId: string): Promise<void> {
+  await deleteDoc(doc(todosRef(uid), todoId));
 }
 export function subscribeToActiveSession(
   uid: string,
