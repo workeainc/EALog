@@ -32,11 +32,11 @@ export default function TodosView({ todos, projects, defaultProjectId, onCreate,
   const overdue = useMemo(() => sortTodos(todos.filter((todo) => todo.status === "open" && todo.plannedDateString < today)), [todos, today]);
   const upcoming = useMemo(() => sortTodos(todos.filter((todo) => todo.status === "open" && todo.plannedDateString > today && todo.plannedDateString <= shiftDate(today, 7))), [todos, today]);
   const recentlyCompleted = useMemo(() => sortTodos(todos.filter((todo) => todo.status === "completed" && todo.completedDateString && todo.completedDateString >= shiftDate(today, -14))), [todos, today]);
+  const projectFor = (id: string | null) => projects.find((project) => project.id === id);
   const activeTodos = tab === "today" ? dayTodos : tab === "upcoming" ? upcoming : recentlyCompleted;
   const matchesSearch = (todo: Todo) => `${todo.title} ${projectFor(todo.projectId)?.name || ""}`.toLowerCase().includes(taskSearch.trim().toLowerCase());
   const displayedTodos = activeTodos.filter(matchesSearch);
   const panelTitle = tab === "today" ? (date === today ? "Today's tasks" : readableDate(date)) : tab === "upcoming" ? "Upcoming tasks" : "Recently completed";
-  const projectFor = (id: string | null) => projects.find((project) => project.id === id);
   const selectDate = (selected: string) => { setDate(selected); setTab("today"); setCalendarMonth(new Date(`${selected}T12:00:00`)); };
   const add = async (event: React.FormEvent) => {
     event.preventDefault(); if (!title.trim()) return; setSaving(true); setError("");
