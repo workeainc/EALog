@@ -65,6 +65,15 @@ export default function ProjectsView({
     const todayMinutes = projectSessions
       .filter((log) => log.date === today)
       .reduce((sum, log) => sum + log.durationMinutes, 0);
+    const dailyActivity = projectSessions.reduce<
+      Record<string, { minutes: number; sessions: number }>
+    >((days, session) => {
+      const entry = days[session.date] || { minutes: 0, sessions: 0 };
+      entry.minutes += session.durationMinutes;
+      entry.sessions += 1;
+      days[session.date] = entry;
+      return days;
+    }, {});
     return (
       <section className="project-dashboard">
         <button
@@ -177,16 +186,21 @@ export default function ProjectsView({
             </div>
           </article>
           <article className="project-dashboard-card">
-            <h3>Recent sessions</h3>
-            {projectSessions.length ? (
-              <div className="project-session-list">
-                {projectSessions.slice(0, 6).map((session, index) => (
-                  <div key={`${session.date}-${index}`}>
-                    <span>{session.date}</span>
-                    <b>{formatMinutes(session.durationMinutes)}</b>
-                    <p>{session.notes || "No summary"}</p>
-                  </div>
-                ))}
+            <h3>Activity by day</h3>
+            {Object.keys(dailyActivity).length ? (
+              <div className="project-day-list">
+                {Object.entries(dailyActivity)
+                  .sort(([a], [b]) => b.localeCompare(a))
+                  .map(([day, activity]) => (
+                    <div key={day}>
+                      <span>{day}</span>
+                      <b>{formatMinutes(activity.minutes)}</b>
+                      <small>
+                        {activity.sessions} session
+                        {activity.sessions === 1 ? "" : "s"}
+                      </small>
+                    </div>
+                  ))}
               </div>
             ) : (
               <p className="muted">

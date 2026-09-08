@@ -1085,6 +1085,29 @@ td {
 .project-session-list b {
   color: #5c49c0;
 }
+.project-day-list {
+  display: grid;
+  gap: 8px;
+}
+.project-day-list > div {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0edf5;
+}
+.project-day-list span {
+  color: #5f596f;
+}
+.project-day-list b {
+  color: #5c49c0;
+}
+.project-day-list small {
+  color: #817a90;
+  min-width: 70px;
+  text-align: right;
+}
 @media (max-width: 640px) {
   .project-dashboard-hero,
   .project-dashboard-stats,

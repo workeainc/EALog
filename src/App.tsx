@@ -1024,7 +1024,7 @@ export default function App() {
         {view === "projects" ? (
           <ProjectsView
             projects={projects}
-            logs={recentLogs}
+            logs={monthLogs}
             selectedProjectId={projectDashboardId}
             onSelectProject={setProjectDashboardId}
             onEdit={(project) => {
