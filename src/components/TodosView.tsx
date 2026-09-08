@@ -1,5 +1,5 @@
 import { AlertCircle, Bell, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, ListTodo, Move, Pencil, Plus, Search, Trash2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { buildTodoDayStats, sortTodos, todoDateKey } from "../lib/todos";
 import type { Project, Todo, TodoPriority } from "../types/tracker";
 
@@ -25,7 +25,6 @@ export default function TodosView({ todos, projects, defaultProjectId, onCreate,
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date(`${todoDateKey()}T12:00:00`));
   const today = todoDateKey();
   const stats = useMemo(() => buildTodoDayStats(todos, date), [todos, date]);
   const dayTodos = useMemo(() => sortTodos(todos.filter((todo) => todo.plannedDateString === date)), [todos, date]);
@@ -37,52 +36,19 @@ export default function TodosView({ todos, projects, defaultProjectId, onCreate,
   const matchesSearch = (todo: Todo) => `${todo.title} ${projectFor(todo.projectId)?.name || ""}`.toLowerCase().includes(taskSearch.trim().toLowerCase());
   const displayedTodos = activeTodos.filter(matchesSearch);
   const panelTitle = tab === "today" ? (date === today ? "Today's tasks" : readableDate(date)) : tab === "upcoming" ? "Upcoming tasks" : "Recently completed";
-  const selectDate = (selected: string) => { setDate(selected); setTab("today"); setCalendarMonth(new Date(`${selected}T12:00:00`)); };
+  const selectDate = (selected: string) => { setDate(selected); setTab("today"); };
   const add = async (event: React.FormEvent) => {
     event.preventDefault(); if (!title.trim()) return; setSaving(true); setError("");
     try { await onCreate({ title, projectId: projectId || null, plannedDateString: date, priority }); setTitle(""); }
     catch (reason: any) { setError(reason?.message || "Could not add task."); }
     finally { setSaving(false); }
   };
-  return <section className="todos-view todos-workspace">
-    <div className="todo-page-heading">
-      <div><h2>Tasks</h2><p className="muted">Plan your day, connect tasks with projects, and keep momentum.</p></div>
-      <div className="todo-heading-actions"><label className="todo-global-search"><Search size={15} /><input value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="Search tasks, projects…" aria-label="Search tasks and projects" /></label><button type="button" className="icon-btn" aria-label="Open calendar" onClick={() => selectDate(today)}><CalendarDays size={16} /></button><button type="button" className="icon-btn todo-notification" aria-label="Notifications"><Bell size={16} /><i /></button></div>
-    </div>
-    <div className="todo-workspace-toolbar">
-      <div className="todo-date-nav" aria-label="Task date">
-        <button className="icon-btn" type="button" onClick={() => selectDate(shiftDate(date, -1))} aria-label="Previous day"><ChevronLeft size={18} /></button>
-        <button className="outline-btn todo-date-button" type="button" onClick={() => selectDate(today)}>{date === today ? `Today, ${new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : readableDate(date)}</button>
-        <button className="icon-btn" type="button" onClick={() => selectDate(shiftDate(date, 1))} aria-label="Next day"><ChevronRight size={18} /></button>
-        <button className="outline-btn todo-calendar-button" type="button" onClick={() => setCalendarMonth(new Date(`${date}T12:00:00`))}><CalendarDays size={15} /> Calendar</button>
-      </div>
-      <div className="todo-tabs" role="tablist" aria-label="Task views">
-        {([ ["today", "Today"], ["upcoming", "Upcoming"], ["completed", "Completed"] ] as const).map(([value, label]) => <button key={value} role="tab" type="button" aria-selected={tab === value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}
-      </div>
-    </div>
+  return <section className="task-target" aria-label="Tasks workspace">
+    <header className="task-target-header"><div><h2>Tasks</h2><p>Plan your day, connect tasks with projects, and keep momentum.</p></div><div className="task-target-header-actions"><label><Search size={16} /><input value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="Search tasks, projects…" aria-label="Search tasks and projects" /></label><button type="button" onClick={() => selectDate(today)} aria-label="Open calendar"><CalendarDays size={17} /></button><button type="button" className="task-target-bell" aria-label="Notifications"><Bell size={17} /><i /></button></div></header>
+    <div className="task-target-controls"><div className="task-target-date"><button type="button" onClick={() => selectDate(shiftDate(date, -1))} aria-label="Previous day"><ChevronLeft size={17} /></button><span>{date === today ? `Today, ${new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : readableDate(date)}</span><button type="button" onClick={() => selectDate(shiftDate(date, 1))} aria-label="Next day"><ChevronRight size={17} /></button></div><button className="task-target-calendar" type="button" onClick={() => selectDate(today)}><CalendarDays size={16} /> Calendar</button><div className="task-target-tabs">{([ ["today", "Today"], ["upcoming", "Upcoming"], ["completed", "Completed"] ] as const).map(([value, label]) => <button key={value} type="button" className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}</div></div>
     {error && <p className="sync-warning">{error}</p>}
-    <div className="todo-dashboard-grid">
-      <form className="todo-quick-add" onSubmit={add}>
-          <input aria-label="Task title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={240} placeholder="Add a task…" />
-          <select aria-label="Project" value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">Select project</option>{projects.filter((project) => project.active).map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select>
-          <select aria-label="Priority" value={priority} onChange={(event) => setPriority(event.target.value as TodoPriority)}><option value="high">High priority</option><option value="medium">Medium priority</option><option value="low">Low priority</option></select>
-          <button className="start-btn" disabled={saving} type="submit"><Plus size={17} />{saving ? "Adding…" : "Add task"}</button>
-      </form>
-      <div className="todo-primary-column">
-        <article className="todo-panel todo-main-panel">
-          <div className="todo-panel-head"><div><h3>{panelTitle}</h3><p>{tab === "today" ? `${stats.open} remaining · ${stats.completionPercent}% plan completed` : tab === "upcoming" ? "Your next 7 planned days" : "Finished work from the last 14 days"}</p></div><span>{activeTodos.length} tasks</span></div>
-          {displayedTodos.length ? <div className="todo-list">{displayedTodos.map((todo) => <TodoRow key={todo.id} todo={todo} project={projectFor(todo.projectId)} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} canMove={todo.status === "open" && todo.plannedDateString !== today} />)}</div> : <div className="todo-empty"><ListTodo size={28} /><h3>No tasks here</h3><p>Add the work you want to finish, or choose another view.</p></div>}
-        </article>
-      </div>
-      <aside className="todo-side">
-        <TodoGroup title="Overdue" subtitle="Move these deliberately—nothing is rescheduled automatically." todos={overdue.filter(matchesSearch)} projects={projects} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} showMove />
-        <TodoGroup title="Recently completed" subtitle="Finished work from the last 14 days." todos={recentlyCompleted.filter(matchesSearch).slice(0, 5)} projects={projects} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} />
-      </aside>
-      <aside className="todo-calendar-column">
-        <TaskCalendar todos={todos} month={calendarMonth} selectedDate={date} onPrevious={() => setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))} onNext={() => setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))} onSelect={selectDate} />
-        <p className="todo-calendar-hint"><CalendarDays size={16} />Click a date to view its tasks for that day.</p>
-      </aside>
-    </div>
+    <form className="task-target-add" onSubmit={add}><input aria-label="Task title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={240} placeholder="Add a task…" /><select aria-label="Project" value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">Select project</option>{projects.filter((project) => project.active).map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><select aria-label="Priority" value={priority} onChange={(event) => setPriority(event.target.value as TodoPriority)}><option value="high">High priority</option><option value="medium">Medium priority</option><option value="low">Low priority</option></select><button disabled={saving} type="submit"><Plus size={17} />{saving ? "Adding…" : "Add task"}</button></form>
+    <div className="task-target-grid"><article className="task-target-main"><h3>{panelTitle} <span>({displayedTodos.length})</span></h3>{displayedTodos.length ? <div>{displayedTodos.map((todo) => <TargetTaskCard key={todo.id} todo={todo} project={projectFor(todo.projectId)} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} canMove={todo.status === "open" && todo.plannedDateString !== today} />)}</div> : <div className="task-target-empty"><ListTodo size={28} /><b>No tasks here</b><p>Add the work you want to finish.</p></div>}</article><aside className="task-target-side"><TargetSidePanel title="Overdue" todos={overdue.filter(matchesSearch)} projects={projects} icon={<AlertCircle size={17} />} tone="overdue" onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} /><TargetSidePanel title="Recently completed" todos={recentlyCompleted.filter(matchesSearch).slice(0, 5)} projects={projects} icon={<CheckCircle2 size={17} />} tone="completed" onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} /></aside></div>
     {editingTodo && <TodoEditModal todo={editingTodo} projects={projects} onClose={() => setEditingTodo(null)} onSave={async (patch) => { await onUpdate(editingTodo, patch); setEditingTodo(null); }} />}
   </section>;
 }
@@ -90,6 +56,18 @@ export default function TodosView({ todos, projects, defaultProjectId, onCreate,
 function TodoGroup({ title, subtitle, todos, projects, onToggle, onMove, onDelete, onEdit, showMove = false }: { title: string; subtitle: string; todos: Todo[]; projects: Project[]; onToggle: Props["onToggle"]; onMove: Props["onMove"]; onDelete: Props["onDelete"]; onEdit: (todo: Todo) => void; showMove?: boolean }) {
   const overdueGroup = title === "Overdue";
   return <article className={`todo-panel todo-compact ${overdueGroup ? "todo-overdue-panel" : "todo-completed-panel"}`}><div className="todo-panel-head"><div><i className="todo-group-icon">{overdueGroup ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}</i><h3>{title} ({todos.length})</h3></div><button className="text-btn" type="button">View all</button></div>{todos.length ? <div className="todo-list">{todos.map((todo) => <TodoRow key={todo.id} todo={todo} project={projects.find((project) => project.id === todo.projectId)} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={onEdit} canMove={showMove && todo.plannedDateString !== todoDateKey()} compact />)}</div> : <p className="muted todo-group-empty">Nothing here.</p>}</article>;
+}
+
+function TargetTaskCard({ todo, project, onToggle, onMove, onDelete, onEdit, canMove }: { todo: Todo; project?: Project; onToggle: Props["onToggle"]; onMove: Props["onMove"]; onDelete: Props["onDelete"]; onEdit: (todo: Todo) => void; canMove: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const run = async (action: () => Promise<void>) => { setBusy(true); try { await action(); } finally { setBusy(false); } };
+  const completed = todo.status === "completed";
+  const dateLabel = completed ? `Completed ${todo.completedDateString ? readableDate(todo.completedDateString) : ""}` : todo.plannedDateString === todoDateKey() ? "Today" : readableDate(todo.plannedDateString);
+  return <article className={`task-target-card ${completed ? "completed" : ""}`}><div className="task-target-card-main"><button type="button" className="task-target-check" disabled={busy} onClick={() => void run(() => onToggle(todo, !completed))} aria-label={completed ? "Mark task open" : "Complete task"}>{completed && <Check size={14} />}</button><div><h4>{todo.title}</h4><p>{completed ? "Completed work item" : "Planned work item for this project"}</p><footer><span className="task-target-project"><i style={{ background: project?.color || "#64748b" }} />{project?.name || "Personal / Inbox"}</span><span className={`task-target-priority ${todo.priority}`}>{todo.priority}</span><span className={completed ? "done-date" : ""}><CalendarDays size={12} />{dateLabel}</span></footer></div></div><div className="task-target-row-actions">{canMove && <button type="button" aria-label="Move task to today" disabled={busy} onClick={() => void run(() => onMove(todo, todoDateKey()))}><Move size={15} /></button>}<button type="button" aria-label="Edit task" disabled={busy} onClick={() => onEdit(todo)}><Pencil size={15} /></button><button type="button" aria-label="Delete task" disabled={busy} onClick={() => void run(() => onDelete(todo))}><Trash2 size={15} /></button></div></article>;
+}
+
+function TargetSidePanel({ title, todos, projects, icon, tone, onToggle, onMove, onDelete, onEdit }: { title: string; todos: Todo[]; projects: Project[]; icon: ReactNode; tone: "overdue" | "completed"; onToggle: Props["onToggle"]; onMove: Props["onMove"]; onDelete: Props["onDelete"]; onEdit: (todo: Todo) => void }) {
+  return <section className={`task-target-side-card ${tone}`}><header><div><i>{icon}</i><h3>{title} ({todos.length})</h3></div><button type="button">View all</button></header>{todos.length ? <div>{todos.map((todo) => <TargetTaskCard key={todo.id} todo={todo} project={projects.find((project) => project.id === todo.projectId)} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={onEdit} canMove={tone === "overdue"} />)}</div> : <p>Nothing here.</p>}</section>;
 }
 
 function TodoRow({ todo, project, onToggle, onMove, onDelete, onEdit, canMove, compact = false }: { todo: Todo; project?: Project; onToggle: Props["onToggle"]; onMove: Props["onMove"]; onDelete: Props["onDelete"]; onEdit: (todo: Todo) => void; canMove: boolean; compact?: boolean }) {
