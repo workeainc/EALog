@@ -1310,6 +1310,115 @@ td {
   gap: 8px;
   align-items: center;
 }
+.todo-calendar-toggle {
+  margin-left: auto;
+}
+.task-calendar {
+  padding: 16px;
+  border: 1px solid #e6e0f2;
+  border-radius: 14px;
+  background: #fff;
+}
+.task-calendar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.task-calendar-head h3 {
+  margin: 0;
+  color: #372f50;
+  font-size: 16px;
+}
+.task-calendar-weekdays,
+.task-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+.task-calendar-weekdays {
+  margin-bottom: 5px;
+  text-align: center;
+  color: #8a8397;
+  font-size: 11px;
+}
+.task-calendar-grid > button {
+  min-height: 52px;
+  border: 1px solid #f0edf4;
+  border-radius: 9px;
+  background: #fff;
+  color: #4b435e;
+  cursor: pointer;
+  text-align: left;
+  padding: 6px;
+}
+.task-calendar-grid > button:hover,
+.task-calendar-grid > button.selected {
+  border-color: #a995f2;
+  background: #f7f4ff;
+}
+.task-calendar-grid > button b {
+  font-size: 12px;
+}
+.task-calendar-dots {
+  display: flex;
+  gap: 3px;
+  margin-top: 11px;
+}
+.task-calendar-dots i,
+.task-calendar-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.task-calendar-dots .planned,
+.task-calendar-legend .planned {
+  background: #8065ed;
+}
+.task-calendar-dots .completed,
+.task-calendar-legend .completed {
+  background: #22a474;
+}
+.task-calendar-dots .overdue,
+.task-calendar-legend .overdue {
+  background: #e55d69;
+}
+.task-calendar-legend {
+  margin: 12px 0 0;
+  color: #837c91;
+  font-size: 12px;
+}
+.task-calendar-legend i {
+  margin: 0 4px 0 10px;
+  vertical-align: middle;
+}
+.task-calendar-legend i:first-child {
+  margin-left: 0;
+}
+.todo-edit-modal {
+  max-width: 520px;
+}
+.todo-edit-modal .modal-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.todo-edit-modal input,
+.todo-edit-modal select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #dcd6e7;
+  border-radius: 9px;
+  padding: 10px 11px;
+  color: #373148;
+  font: inherit;
+}
+.todo-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
 .todo-date-nav .outline-btn {
   min-width: 210px;
   justify-content: center;
@@ -1478,6 +1587,16 @@ td {
   .todo-date-nav .outline-btn {
     min-width: 0;
     flex: 1;
+  }
+  .todo-calendar-toggle {
+    margin-left: 0;
+  }
+  .task-calendar-grid > button {
+    min-height: 45px;
+  }
+  .todo-edit-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
   }
   .todo-row {
     align-items: flex-start;

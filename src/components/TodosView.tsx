@@ -1,10 +1,13 @@
 import {
+  CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
   ListTodo,
+  Pencil,
   Plus,
   Trash2,
+  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { buildTodoDayStats, sortTodos, todoDateKey } from "../lib/todos";
@@ -22,6 +25,15 @@ type Props = {
   }) => Promise<void>;
   onToggle: (todo: Todo, complete: boolean) => Promise<void>;
   onMove: (todo: Todo, date: string) => Promise<void>;
+  onUpdate: (
+    todo: Todo,
+    patch: {
+      title: string;
+      projectId: string | null;
+      priority: TodoPriority;
+      plannedDateString: string;
+    },
+  ) => Promise<void>;
   onDelete: (todo: Todo) => Promise<void>;
 };
 
@@ -46,6 +58,7 @@ export default function TodosView({
   onCreate,
   onToggle,
   onMove,
+  onUpdate,
   onDelete,
 }: Props) {
   const [date, setDate] = useState(todoDateKey());
@@ -54,6 +67,11 @@ export default function TodosView({
   const [priority, setPriority] = useState<TodoPriority>("medium");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(
+    () => new Date(`${todoDateKey()}T12:00:00`),
+  );
   const today = todoDateKey();
   const stats = useMemo(() => buildTodoDayStats(todos, date), [todos, date]);
   const dayTodos = useMemo(
@@ -137,7 +155,38 @@ export default function TodosView({
         >
           <ChevronRight size={18} />
         </button>
+        <button
+          className="outline-btn todo-calendar-toggle"
+          type="button"
+          onClick={() => setCalendarOpen((open) => !open)}
+        >
+          <CalendarDays size={16} />{" "}
+          {calendarOpen ? "Hide calendar" : "Calendar"}
+        </button>
       </div>
+      {calendarOpen && (
+        <TaskCalendar
+          todos={todos}
+          month={calendarMonth}
+          selectedDate={date}
+          onPrevious={() =>
+            setCalendarMonth(
+              (current) =>
+                new Date(current.getFullYear(), current.getMonth() - 1, 1),
+            )
+          }
+          onNext={() =>
+            setCalendarMonth(
+              (current) =>
+                new Date(current.getFullYear(), current.getMonth() + 1, 1),
+            )
+          }
+          onSelect={(selected) => {
+            setDate(selected);
+            setCalendarMonth(new Date(`${selected}T12:00:00`));
+          }}
+        />
+      )}
       <form className="todo-quick-add" onSubmit={add}>
         <input
           aria-label="Task title"
@@ -196,6 +245,7 @@ export default function TodosView({
                   onToggle={onToggle}
                   onMove={onMove}
                   onDelete={onDelete}
+                  onEdit={setEditingTodo}
                   canMove={todo.plannedDateString !== today}
                 />
               ))}
@@ -217,6 +267,7 @@ export default function TodosView({
             onToggle={onToggle}
             onMove={onMove}
             onDelete={onDelete}
+            onEdit={setEditingTodo}
             showMove
           />
           <TodoGroup
@@ -227,9 +278,21 @@ export default function TodosView({
             onToggle={onToggle}
             onMove={onMove}
             onDelete={onDelete}
+            onEdit={setEditingTodo}
           />
         </aside>
       </div>
+      {editingTodo && (
+        <TodoEditModal
+          todo={editingTodo}
+          projects={projects}
+          onClose={() => setEditingTodo(null)}
+          onSave={async (patch) => {
+            await onUpdate(editingTodo, patch);
+            setEditingTodo(null);
+          }}
+        />
+      )}
     </section>
   );
 }
@@ -242,6 +305,7 @@ function TodoGroup({
   onToggle,
   onMove,
   onDelete,
+  onEdit,
   showMove = false,
 }: {
   title: string;
@@ -251,6 +315,7 @@ function TodoGroup({
   onToggle: Props["onToggle"];
   onMove: Props["onMove"];
   onDelete: Props["onDelete"];
+  onEdit: (todo: Todo) => void;
   showMove?: boolean;
 }) {
   return (
@@ -274,6 +339,7 @@ function TodoGroup({
               onToggle={onToggle}
               onMove={onMove}
               onDelete={onDelete}
+              onEdit={onEdit}
               canMove={showMove}
             />
           ))}
@@ -291,6 +357,7 @@ function TodoRow({
   onToggle,
   onMove,
   onDelete,
+  onEdit,
   canMove,
 }: {
   todo: Todo;
@@ -298,6 +365,7 @@ function TodoRow({
   onToggle: Props["onToggle"];
   onMove: Props["onMove"];
   onDelete: Props["onDelete"];
+  onEdit: (todo: Todo) => void;
   canMove: boolean;
 }) {
   const [busy, setBusy] = useState(false);
@@ -347,6 +415,15 @@ function TodoRow({
         </button>
       )}
       <button
+        className="icon-btn todo-edit"
+        type="button"
+        disabled={busy}
+        onClick={() => onEdit(todo)}
+        aria-label="Edit task"
+      >
+        <Pencil size={14} />
+      </button>
+      <button
         className="icon-btn todo-delete"
         type="button"
         disabled={busy}
@@ -355,6 +432,198 @@ function TodoRow({
       >
         <Trash2 size={15} />
       </button>
+    </div>
+  );
+}
+
+function TaskCalendar({
+  todos,
+  month,
+  selectedDate,
+  onPrevious,
+  onNext,
+  onSelect,
+}: {
+  todos: Todo[];
+  month: Date;
+  selectedDate: string;
+  onPrevious: () => void;
+  onNext: () => void;
+  onSelect: (date: string) => void;
+}) {
+  const year = month.getFullYear();
+  const monthIndex = month.getMonth();
+  const first = new Date(year, monthIndex, 1);
+  const days = new Date(year, monthIndex + 1, 0).getDate();
+  const mondayOffset = (first.getDay() + 6) % 7;
+  const cells = Array.from({ length: mondayOffset + days }, (_, index) => {
+    if (index < mondayOffset) return null;
+    return todoDateKey(new Date(year, monthIndex, index - mondayOffset + 1));
+  });
+  return (
+    <section className="task-calendar" aria-label="Task calendar">
+      <div className="task-calendar-head">
+        <button
+          className="icon-btn"
+          onClick={onPrevious}
+          aria-label="Previous month"
+        >
+          <ChevronLeft size={17} />
+        </button>
+        <h3>
+          {month.toLocaleDateString("en-GB", {
+            month: "long",
+            year: "numeric",
+          })}
+        </h3>
+        <button className="icon-btn" onClick={onNext} aria-label="Next month">
+          <ChevronRight size={17} />
+        </button>
+      </div>
+      <div className="task-calendar-weekdays">
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="task-calendar-grid">
+        {cells.map((date, index) => {
+          if (!date) return <span key={`blank-${index}`} />;
+          const stats = buildTodoDayStats(todos, date);
+          return (
+            <button
+              type="button"
+              key={date}
+              className={date === selectedDate ? "selected" : ""}
+              onClick={() => onSelect(date)}
+              aria-label={`${readableDate(date)}: ${stats.planned} planned, ${stats.completedOnDate} completed, ${stats.overdue} overdue`}
+            >
+              <b>{Number(date.slice(-2))}</b>
+              <span className="task-calendar-dots">
+                {stats.planned > 0 && <i className="planned" />}
+                {stats.completedOnDate > 0 && <i className="completed" />}
+                {stats.overdue > 0 && <i className="overdue" />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="task-calendar-legend">
+        <i className="planned" /> planned <i className="completed" /> completed{" "}
+        <i className="overdue" /> overdue
+      </p>
+    </section>
+  );
+}
+
+function TodoEditModal({
+  todo,
+  projects,
+  onClose,
+  onSave,
+}: {
+  todo: Todo;
+  projects: Project[];
+  onClose: () => void;
+  onSave: (patch: {
+    title: string;
+    projectId: string | null;
+    priority: TodoPriority;
+    plannedDateString: string;
+  }) => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setSaving(true);
+    setError("");
+    try {
+      await onSave({
+        title: String(form.get("title") || "").trim(),
+        projectId: String(form.get("projectId") || "") || null,
+        priority: String(form.get("priority")) as TodoPriority,
+        plannedDateString: String(form.get("plannedDateString") || ""),
+      });
+    } catch (reason: any) {
+      setError(reason?.message || "Could not update task.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <form className="note-modal todo-edit-modal" onSubmit={submit}>
+        <button
+          className="modal-close"
+          type="button"
+          onClick={onClose}
+          disabled={saving}
+          aria-label="Close edit task"
+        >
+          <X size={18} />
+        </button>
+        <div className="modal-icon">
+          <Pencil size={20} />
+        </div>
+        <h3>Edit task</h3>
+        <p>
+          Editing the planned date does not change when this task was completed.
+        </p>
+        <label className="modal-field">
+          TASK TITLE
+          <input
+            name="title"
+            defaultValue={todo.title}
+            maxLength={240}
+            required
+          />
+        </label>
+        <label className="modal-field">
+          PROJECT
+          <select name="projectId" defaultValue={todo.projectId || ""}>
+            <option value="">Personal / Inbox</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="todo-edit-grid">
+          <label className="modal-field">
+            PRIORITY
+            <select name="priority" defaultValue={todo.priority}>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <label className="modal-field">
+            PLANNED DATE
+            <input
+              name="plannedDateString"
+              type="date"
+              defaultValue={todo.plannedDateString}
+              required
+            />
+          </label>
+        </div>
+        {error && <p className="sync-warning">{error}</p>}
+        <div className="modal-actions">
+          <button
+            className="outline-btn"
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+          <button className="start-btn" disabled={saving} type="submit">
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

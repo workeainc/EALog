@@ -13,13 +13,17 @@
       }
     }
   },
+  "emulators": {
+    "firestore": {
+      "port": 8088
+    },
+    "ui": {
+      "enabled": false
+    }
+  },
   "hosting": {
     "public": "dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
         "source": "**",

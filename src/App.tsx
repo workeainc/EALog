@@ -975,6 +975,25 @@ export default function App() {
       ),
     );
   };
+  const updateTodo = async (
+    todo: Todo,
+    patch: {
+      title: string;
+      projectId: string | null;
+      priority: TodoPriority;
+      plannedDateString: string;
+    },
+  ) => {
+    if (uid)
+      return (await import("./lib/todo-service")).updateTodo(
+        uid,
+        todo.id,
+        patch,
+      );
+    setTodos((items) =>
+      items.map((item) => (item.id === todo.id ? { ...item, ...patch } : item)),
+    );
+  };
   const removeTodo = async (todo: Todo) => {
     if (!window.confirm(`Delete “${todo.title}”?`)) return;
     if (uid)
@@ -1223,6 +1242,7 @@ export default function App() {
             onCreate={createTodo}
             onToggle={toggleTodo}
             onMove={moveTodo}
+            onUpdate={updateTodo}
             onDelete={removeTodo}
           />
         ) : view === "reports" ? (
