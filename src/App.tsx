@@ -152,6 +152,7 @@ export default function App() {
   const [note, setNote] = useState("");
   const [summary, setSummary] = useState("");
   const [sessionTodoIds, setSessionTodoIds] = useState<string[]>([]);
+  const [notedSessionTodoIds, setNotedSessionTodoIds] = useState<string[]>([]);
   const [finishingSession, setFinishingSession] = useState(false);
   const [todayLogs, setTodayLogs] = useState<ReportLog[]>(
     firebaseConfigured ? [] : DEMO_LOGS,
@@ -668,12 +669,14 @@ export default function App() {
   };
   const openFinishModal = () => {
     setSessionTodoIds([]);
+    setNotedSessionTodoIds([]);
     setShowNote(true);
   };
   const closeFinishModal = () => {
     if (finishingSession) return;
     setShowNote(false);
     setSessionTodoIds([]);
+    setNotedSessionTodoIds([]);
   };
   const finish = async () => {
     if (!note.trim()) return;
@@ -759,6 +762,7 @@ export default function App() {
       setNote("");
       setSummary("");
       setSessionTodoIds([]);
+      setNotedSessionTodoIds([]);
       setShowNote(false);
     } catch (error: any) {
       setSyncError(error?.message || "Could not save session.");
@@ -2041,13 +2045,29 @@ export default function App() {
                           name="completed-session-todos"
                           checked={checked}
                           disabled={finishingSession}
-                          onChange={() =>
-                            setSessionTodoIds((ids) =>
-                              ids.includes(todo.id)
-                                ? ids.filter((id) => id !== todo.id)
-                                : [...ids, todo.id],
-                            )
-                          }
+                          onChange={() => {
+                            if (checked) {
+                              setSessionTodoIds((ids) =>
+                                ids.filter((id) => id !== todo.id),
+                              );
+                              return;
+                            }
+                            setSessionTodoIds((ids) => [...ids, todo.id]);
+                            // Add the task once, without overwriting any
+                            // detailed work note the user has already typed.
+                            if (!notedSessionTodoIds.includes(todo.id)) {
+                              setNote((current) =>
+                                current.trim()
+                                  ? `${current.trim()}\n• ${todo.title}`
+                                  : `Completed: ${todo.title}`,
+                              );
+                              setSummary("");
+                              setNotedSessionTodoIds((ids) => [
+                                ...ids,
+                                todo.id,
+                              ]);
+                            }
+                          }}
                         />
                         <span>{todo.title}</span>
                         <small>{todo.priority}</small>
