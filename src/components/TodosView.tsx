@@ -1,4 +1,4 @@
-import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, ListTodo, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertCircle, Bell, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, ListTodo, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { buildTodoDayStats, sortTodos, todoDateKey } from "../lib/todos";
 import type { Project, Todo, TodoPriority } from "../types/tracker";
@@ -52,7 +52,7 @@ export default function TodosView({ todos, projects, defaultProjectId, onCreate,
     <div className="todo-workspace-toolbar">
       <div className="todo-date-nav" aria-label="Task date">
         <button className="icon-btn" type="button" onClick={() => selectDate(shiftDate(date, -1))} aria-label="Previous day"><ChevronLeft size={18} /></button>
-        <button className="outline-btn todo-date-button" type="button" onClick={() => selectDate(today)}>{readableDate(date)}</button>
+        <button className="outline-btn todo-date-button" type="button" onClick={() => selectDate(today)}>{date === today ? `Today, ${new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : readableDate(date)}</button>
         <button className="icon-btn" type="button" onClick={() => selectDate(shiftDate(date, 1))} aria-label="Next day"><ChevronRight size={18} /></button>
         <button className="outline-btn todo-calendar-button" type="button" onClick={() => setCalendarMonth(new Date(`${date}T12:00:00`))}><CalendarDays size={15} /> Calendar</button>
       </div>
@@ -88,7 +88,8 @@ export default function TodosView({ todos, projects, defaultProjectId, onCreate,
 }
 
 function TodoGroup({ title, subtitle, todos, projects, onToggle, onMove, onDelete, onEdit, showMove = false }: { title: string; subtitle: string; todos: Todo[]; projects: Project[]; onToggle: Props["onToggle"]; onMove: Props["onMove"]; onDelete: Props["onDelete"]; onEdit: (todo: Todo) => void; showMove?: boolean }) {
-  return <article className="todo-panel todo-compact"><div className="todo-panel-head"><div><h3>{title}</h3><p>{subtitle}</p></div><span>{todos.length}</span></div>{todos.length ? <div className="todo-list">{todos.map((todo) => <TodoRow key={todo.id} todo={todo} project={projects.find((project) => project.id === todo.projectId)} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={onEdit} canMove={showMove && todo.plannedDateString !== todoDateKey()} compact />)}</div> : <p className="muted todo-group-empty">Nothing here.</p>}</article>;
+  const overdueGroup = title === "Overdue";
+  return <article className={`todo-panel todo-compact ${overdueGroup ? "todo-overdue-panel" : "todo-completed-panel"}`}><div className="todo-panel-head"><div><i className="todo-group-icon">{overdueGroup ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}</i><h3>{title} ({todos.length})</h3></div><button className="text-btn" type="button">View all</button></div>{todos.length ? <div className="todo-list">{todos.map((todo) => <TodoRow key={todo.id} todo={todo} project={projects.find((project) => project.id === todo.projectId)} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={onEdit} canMove={showMove && todo.plannedDateString !== todoDateKey()} compact />)}</div> : <p className="muted todo-group-empty">Nothing here.</p>}</article>;
 }
 
 function TodoRow({ todo, project, onToggle, onMove, onDelete, onEdit, canMove, compact = false }: { todo: Todo; project?: Project; onToggle: Props["onToggle"]; onMove: Props["onMove"]; onDelete: Props["onDelete"]; onEdit: (todo: Todo) => void; canMove: boolean; compact?: boolean }) {
