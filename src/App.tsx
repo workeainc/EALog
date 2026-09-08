@@ -171,6 +171,10 @@ export default function App() {
   const [needsAuth, setNeedsAuth] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [view, setView] = useState<View>("overview");
+  const [projectNavOpen, setProjectNavOpen] = useState(true);
+  const [projectDashboardId, setProjectDashboardId] = useState<string | null>(
+    null,
+  );
   const [mobileNav, setMobileNav] = useState(false);
   const [activityPeriod, setActivityPeriod] = useState<
     "daily" | "weekly" | "monthly"
@@ -917,16 +921,48 @@ export default function App() {
             <Clock3 size={18} />
             Sessions
           </a>
-          <a
-            className={view === "projects" ? "active" : ""}
-            onClick={() => {
-              setView("projects");
-              setMobileNav(false);
-            }}
-          >
-            <FolderKanban size={18} />
-            Projects
-          </a>
+          <div className={`sidebar-projects ${projectNavOpen ? "open" : ""}`}>
+            <button
+              className={view === "projects" ? "active" : ""}
+              onClick={() => {
+                setProjectNavOpen((open) => !open);
+                setView("projects");
+                setProjectDashboardId(null);
+              }}
+            >
+              <span>
+                <FolderKanban size={18} /> Projects
+              </span>
+              <ChevronDown size={15} />
+            </button>
+            {projectNavOpen && (
+              <div className="sidebar-project-list">
+                {projects
+                  .filter((project) => project.active)
+                  .map((project) => (
+                    <button
+                      key={project.id}
+                      className={
+                        view === "projects" && projectDashboardId === project.id
+                          ? "active"
+                          : ""
+                      }
+                      onClick={() => {
+                        setProjectDashboardId(project.id);
+                        setView("projects");
+                        setMobileNav(false);
+                      }}
+                    >
+                      <i style={{ background: project.color }} />
+                      {project.name}
+                    </button>
+                  ))}
+                {!projects.filter((project) => project.active).length && (
+                  <small>No active projects</small>
+                )}
+              </div>
+            )}
+          </div>
           <a
             className={view === "reports" ? "active" : ""}
             onClick={() => {
@@ -989,12 +1025,13 @@ export default function App() {
           <ProjectsView
             projects={projects}
             logs={recentLogs}
+            selectedProjectId={projectDashboardId}
+            onSelectProject={setProjectDashboardId}
             onEdit={(project) => {
               setProjectSaveError("");
               setEditingProject(project);
             }}
             onStatus={changeProjectStatus}
-            onMove={moveProject}
           />
         ) : view === "reports" ? (
           <ReportsView
