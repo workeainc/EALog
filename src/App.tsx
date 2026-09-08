@@ -1622,7 +1622,7 @@ export default function App() {
                     <i className="project-row-dot" style={{ background: project.color }} />
                     <div className="overview-project-name"><b>{project.name}</b><span>{mins(project.completed)} / {mins(project.targetMinutes)}</span></div>
                     <div className="overview-project-progress"><div><i style={{ width: `${Math.min(100, (project.completed / project.targetMinutes) * 100)}%`, background: project.color }} /></div><small>{Math.round((project.completed / project.targetMinutes) * 100)}%</small></div>
-                    <div className="overview-project-tasks"><span>Tasks</span><b>{project.todoStats.completedFromPlan} / {project.todoStats.planned}</b></div>
+                    <div className="overview-project-tasks"><span>Tasks</span><b>{project.todoStats.completedFromPlan} / {project.todoStats.planned}</b><em>{project.todoStats.planned ? "Today" : "No tasks"}</em></div>
                   </button>
                 ))}
               </div>
@@ -1633,6 +1633,7 @@ export default function App() {
               <aside className="overview-aside">
                 <OverviewCalendar todos={todos} onOpenTasks={() => setView("todos")} />
                 <section className="overview-card attention-card"><div className="overview-card-head"><div><span className="overview-title-icon warning"><Bell size={17} /></span><h3>Needs attention</h3></div></div>{overdueTodos.length ? <><div className="attention-line"><b>{overdueTodos.length} overdue task{overdueTodos.length === 1 ? "" : "s"}</b><button className="text-btn" onClick={() => setView("todos")}>View all →</button></div>{overdueTodos.slice(0, 2).map((todo) => <div className="attention-task" key={todo.id}><i /><span>{todo.title}<small>{projectName(todo.projectId || "Personal")} · planned {todo.plannedDateString}</small></span></div>)}</> : <div className="overview-empty attention-clear"><Trophy size={20} /><span>All clear — no overdue tasks.</span></div>}{progress.some((project) => project.completed < project.targetMinutes) && <div className="attention-pace"><b>Daily pace</b><span>{progress.filter((project) => project.completed < project.targetMinutes).length} project{progress.filter((project) => project.completed < project.targetMinutes).length === 1 ? " needs" : "s need"} more focused time today.</span></div>}</section>
+                <OverviewTaskTimeline todos={todos} projectName={projectName} onOpenTasks={() => setView("todos")} />
               </aside>
             </section>
           </>
@@ -2255,6 +2256,47 @@ function OverviewRecentSessions({
           </button>
         )) : <div className="overview-empty"><Clock3 size={20} /><span>No completed sessions yet.</span></div>}
       </div>
+    </section>
+  );
+}
+
+function OverviewTaskTimeline({
+  todos,
+  projectName,
+  onOpenTasks,
+}: {
+  todos: Todo[];
+  projectName: (id: string) => string;
+  onOpenTasks: () => void;
+}) {
+  const today = localDateKey();
+  const items = sortTodos(
+    todos.filter((todo) => todo.plannedDateString === today),
+  ).slice(0, 5);
+  return (
+    <section className="overview-card task-timeline-card">
+      <div className="overview-card-head">
+        <div>
+          <span className="overview-title-icon timeline"><ListTodo size={17} /></span>
+          <h3>Today’s timeline</h3>
+        </div>
+        <button className="text-btn" onClick={onOpenTasks}>Tasks →</button>
+      </div>
+      {items.length ? (
+        <div className="task-timeline-list">
+          {items.map((todo) => (
+            <button key={todo.id} className={`task-timeline-row ${todo.status === "completed" ? "done" : ""}`} onClick={onOpenTasks}>
+              <i />
+              <span>
+                <b>{todo.title}</b>
+                <small>{projectName(todo.projectId || "Personal")} · {todo.status === "completed" ? "Completed" : "Planned today"}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="overview-empty"><ListTodo size={20} /><span>No timeline items today.</span></div>
+      )}
     </section>
   );
 }
