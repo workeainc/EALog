@@ -17,6 +17,7 @@ import {
   Plus,
   Pencil,
   Settings,
+  Search,
   Square,
   Target,
   Timer,
@@ -170,7 +171,9 @@ export default function App() {
     firebaseConfigured ? [] : DEMO_LOGS,
   );
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [sessionFilter, setSessionFilter] = useState<"last2" | "custom">(
+  const [sessionFilter, setSessionFilter] = useState<
+    "last2" | "last7" | "last30" | "custom"
+  >(
     "last2",
   );
   const [sessionFrom, setSessionFrom] = useState("");
@@ -601,13 +604,14 @@ export default function App() {
       return rows.filter(
         (row) => row.date >= sessionFrom && row.date <= sessionTo,
       );
+    const days = sessionFilter === "last7" ? 7 : sessionFilter === "last30" ? 30 : 2;
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
     const keys = new Set(
-      [today, yesterday].map((date) =>
-        date.toLocaleDateString("en-CA", { timeZone: timezone }),
-      ),
+      Array.from({ length: days }, (_, index) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() - index);
+        return date.toLocaleDateString("en-CA", { timeZone: timezone });
+      }),
     );
     return rows.filter((row) => keys.has(row.date));
   }, [recentLogs, timezone, sessionFilter, sessionFrom, sessionTo]);
@@ -1284,7 +1288,7 @@ export default function App() {
         </div>
       </aside>
       <main className="main">
-        <header>
+        {view !== "sessions" && <header>
           <button className="menu-button" onClick={() => setMobileNav(true)}>
             <Menu />
           </button>
@@ -1312,7 +1316,7 @@ export default function App() {
               <ChevronDown size={15} />
             </div>
           </div>
-        </header>
+        </header>}
         {view === "projects" ? (
           <ProjectsView
             projects={projects}
@@ -2302,191 +2306,59 @@ function OverviewTaskTimeline({
 }
 
 function SessionsCard({
-  title,
-  rows,
-  projectName,
-  projectColor,
-  viewAll,
-  back,
-  filterable,
-  filter,
-  setFilter,
-  from,
-  to,
-  setFrom,
-  setTo,
-  onEdit,
-  onDelete,
+  title, rows, projectName, projectColor, viewAll, back, filterable,
+  filter, setFilter, from, to, setFrom, setTo, onEdit, onDelete,
 }: {
-  title: string;
-  rows: ReturnType<typeof normalizeReportLogs>;
-  projectName: (id: string) => string;
-  projectColor: (id: string) => string;
-  viewAll?: () => void;
-  back?: () => void;
-  filterable?: boolean;
-  filter?: "last2" | "custom";
-  setFilter?: (value: "last2" | "custom") => void;
-  from?: string;
-  to?: string;
-  setFrom?: (value: string) => void;
-  setTo?: (value: string) => void;
+  title: string; rows: ReturnType<typeof normalizeReportLogs>;
+  projectName: (id: string) => string; projectColor: (id: string) => string;
+  viewAll?: () => void; back?: () => void; filterable?: boolean;
+  filter?: "last2" | "last7" | "last30" | "custom";
+  setFilter?: (value: "last2" | "last7" | "last30" | "custom") => void;
+  from?: string; to?: string; setFrom?: (value: string) => void; setTo?: (value: string) => void;
   onEdit?: (row: ReturnType<typeof normalizeReportLogs>[number]) => void;
   onDelete?: (row: ReturnType<typeof normalizeReportLogs>[number]) => void;
 }) {
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
   const totalMinutes = rows.reduce((sum, row) => sum + row.durationMinutes, 0);
   const projectCount = new Set(rows.map((row) => row.projectId)).size;
+  const searchedRows = rows.filter((row) => {
+    const query = search.trim().toLowerCase();
+    return !query || `${projectName(row.projectId)} ${row.notes || ""}`.toLowerCase().includes(query);
+  });
+  const pageSize = 10;
+  const pageCount = Math.max(1, Math.ceil(searchedRows.length / pageSize));
+  const currentPage = Math.min(page, pageCount - 1);
+  const visibleRows = searchedRows.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const selectFilter = (value: "last2" | "last7" | "last30" | "custom") => { setPage(0); setFilter?.(value); };
+  const time = (value: Date) => value.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return (
-    <section className={`sessions-card${back ? " full-sessions" : ""}`}>
-      <div className="card-heading">
-        <div>
-          <h3>{title}</h3>
-          <p className="muted">Your logged work sessions and notes.</p>
-        </div>
-        {viewAll ? (
-          <button className="text-btn" onClick={viewAll}>
-            View all <span>→</span>
-          </button>
-        ) : back ? (
-          <button className="outline-btn" onClick={back}>
-            Back to overview
-          </button>
-        ) : null}
+    <section className={`sessions-card session-workspace${back ? " full-sessions" : ""}`}>
+      <div className="session-page-heading">
+        <div><span className="session-heading-icon"><Clock3 size={21} /></span><div><h2>{title}</h2><p>Review your work history, session notes, and productivity.</p></div></div>
+        {viewAll ? <button className="text-btn" onClick={viewAll}>View all →</button> : back ? <button className="outline-btn" onClick={back}>← Back to overview</button> : null}
       </div>
-      {filterable && (
-        <div className="session-filters">
-          <div className="activity-tabs">
-            <button
-              className={filter === "last2" ? "selected" : ""}
-              onClick={() => setFilter?.("last2")}
-            >
-              Last 2 days
-            </button>
-            <button
-              className={filter === "custom" ? "selected" : ""}
-              onClick={() => setFilter?.("custom")}
-            >
-              Specific range
-            </button>
-          </div>
-          {filter === "custom" && (
-            <>
-              <label>
-                From{" "}
-                <input
-                  id="session-filter-from"
-                  name="session-filter-from"
-                  type="date"
-                  value={from}
-                  onChange={(e) => setFrom?.(e.target.value)}
-                />
-              </label>
-              <label>
-                To{" "}
-                <input
-                  id="session-filter-to"
-                  name="session-filter-to"
-                  type="date"
-                  value={to}
-                  onChange={(e) => setTo?.(e.target.value)}
-                />
-              </label>
-            </>
-          )}
+      {filterable && <div className="session-range-bar">
+        <div className="session-range-tabs">
+          {([ ["last2", "Last 2 days"], ["last7", "Last 7 days"], ["last30", "Last 30 days"], ["custom", "Custom range"] ] as const).map(([value, label]) => <button key={value} className={filter === value ? "selected" : ""} onClick={() => selectFilter(value)}><CalendarDays size={14} />{label}</button>)}
         </div>
-      )}
-      <div className="session-summary-grid">
-        <div>
-          <span>Total tracked</span>
-          <strong>{mins(totalMinutes)}</strong>
-        </div>
-        <div>
-          <span>Sessions</span>
-          <strong>{rows.length}</strong>
-        </div>
-        <div>
-          <span>Projects</span>
-          <strong>{projectCount}</strong>
-        </div>
-        <div>
-          <span>Avg. session</span>
-          <strong>
-            {mins(rows.length ? Math.round(totalMinutes / rows.length) : 0)}
-          </strong>
-        </div>
+        {filter === "custom" && <div className="session-date-range"><label>From<input id="session-filter-from" name="session-filter-from" type="date" value={from} onChange={(e) => { setPage(0); setFrom?.(e.target.value); }} /></label><label>To<input id="session-filter-to" name="session-filter-to" type="date" value={to} onChange={(e) => { setPage(0); setTo?.(e.target.value); }} /></label></div>}
+      </div>}
+      <div className="session-kpi-grid">
+        <SessionKpi icon={<Timer size={19} />} label="Total tracked time" value={mins(totalMinutes)} tone="blue" />
+        <SessionKpi icon={<CalendarDays size={19} />} label="Total sessions" value={String(rows.length)} tone="purple" />
+        <SessionKpi icon={<FolderKanban size={19} />} label="Projects worked on" value={String(projectCount)} tone="green" />
+        <SessionKpi icon={<Activity size={19} />} label="Avg. session duration" value={mins(rows.length ? Math.round(totalMinutes / rows.length) : 0)} tone="pink" />
       </div>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>PROJECT</th>
-              <th>TIME</th>
-              <th>DURATION</th>
-              <th>NOTE</th>
-              {(onEdit || onDelete) && <th>ACTIONS</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length ? (
-              rows.map((row, index) => (
-                <tr key={`${row.date}-${index}`}>
-                  <td>
-                    <div className="project-name">
-                      <i
-                        style={{
-                          background: projectColor(row.projectId),
-                        }}
-                      />
-                      <b>{projectName(row.projectId)}</b>
-                    </div>
-                  </td>
-                  <td>
-                    {row.startTime.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}{" "}
-                    –{" "}
-                    {row.endTime.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </td>
-                  <td>
-                    <b>{mins(row.durationMinutes)}</b>
-                  </td>
-                  <td className="note-cell">{row.notes || "—"}</td>
-                  {(onEdit || onDelete) && (
-                    <td className="session-actions">
-                      {onEdit && (
-                        <button
-                          className="text-btn"
-                          onClick={() => onEdit(row)}
-                        >
-                          Edit
-                        </button>
-                      )}
-                      {onDelete && (
-                        <button
-                          className="text-btn danger-text"
-                          onClick={() => onDelete(row)}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </td>
-                  )}
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={onEdit || onDelete ? 5 : 4} className="note-cell">
-                  No completed sessions yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <section className="session-history-card">
+        <div className="session-history-head"><div><ListTodo size={18} /><h3>Sessions</h3></div><label className="session-search"><Search size={15} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder="Search sessions…" /></label></div>
+        <div className="session-table-wrap"><table className="session-history-table"><thead><tr><th>#</th><th>PROJECT</th><th>START – END</th><th>DURATION</th><th>NOTE / SUMMARY</th><th>ACTIONS</th></tr></thead><tbody>{visibleRows.length ? visibleRows.map((row, index) => <tr key={`${row.id || row.date}-${index}`}><td>{currentPage * pageSize + index + 1}</td><td><div className="session-project-cell"><i style={{ background: projectColor(row.projectId) }} /><span><b>{projectName(row.projectId)}</b><small>Work session</small></span></div></td><td><div className="session-time-cell"><b>{new Date(`${row.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</b><small>{time(row.startTime)} – {time(row.endTime)}</small></div></td><td><b className="session-duration">{mins(row.durationMinutes)}</b></td><td><div className="session-note-cell"><b>{row.notes || "Untitled session"}</b><small>{row.notes || "No session note added."}</small></div></td><td className="session-icon-actions">{onEdit && <button className="icon-btn" title="Edit session" aria-label="Edit session" onClick={() => onEdit(row)}><Pencil size={14} /></button>}{onDelete && <button className="icon-btn danger" title="Delete session" aria-label="Delete session" onClick={() => onDelete(row)}><Trash2 size={14} /></button>}</td></tr>) : <tr><td colSpan={6} className="session-empty-cell">No sessions match this period or search.</td></tr>}</tbody></table></div>
+        <div className="session-pagination"><span>{searchedRows.length ? `Showing ${currentPage * pageSize + 1}–${Math.min((currentPage + 1) * pageSize, searchedRows.length)} of ${searchedRows.length} sessions` : "No sessions"}</span><div><button className="icon-btn" disabled={!currentPage} onClick={() => setPage((value) => Math.max(0, value - 1))}>‹</button><b>{currentPage + 1}</b><span>/ {pageCount}</span><button className="icon-btn" disabled={currentPage >= pageCount - 1} onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))}>›</button></div></div>
+      </section>
     </section>
   );
+}
+
+function SessionKpi({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: string }) {
+  return <article className="session-kpi"><span className={`session-kpi-icon ${tone}`}>{icon}</span><div><small>{label}</small><strong>{value}</strong><em>Selected period</em></div></article>;
 }
