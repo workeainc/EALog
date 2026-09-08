@@ -1288,7 +1288,7 @@ export default function App() {
         </div>
       </aside>
       <main className="main">
-        {view !== "sessions" && view !== "projects" && <header>
+        {view !== "sessions" && view !== "projects" && view !== "todos" && <header>
           <button className="menu-button" onClick={() => setMobileNav(true)}>
             <Menu />
           </button>

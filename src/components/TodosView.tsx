@@ -1,4 +1,4 @@
-import { CalendarDays, Check, ChevronLeft, ChevronRight, ListTodo, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, ListTodo, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { buildTodoDayStats, sortTodos, todoDateKey } from "../lib/todos";
 import type { Project, Todo, TodoPriority } from "../types/tracker";
@@ -21,6 +21,7 @@ export default function TodosView({ todos, projects, defaultProjectId, onCreate,
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState(defaultProjectId || "");
   const [priority, setPriority] = useState<TodoPriority>("medium");
+  const [taskSearch, setTaskSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
@@ -32,6 +33,8 @@ export default function TodosView({ todos, projects, defaultProjectId, onCreate,
   const upcoming = useMemo(() => sortTodos(todos.filter((todo) => todo.status === "open" && todo.plannedDateString > today && todo.plannedDateString <= shiftDate(today, 7))), [todos, today]);
   const recentlyCompleted = useMemo(() => sortTodos(todos.filter((todo) => todo.status === "completed" && todo.completedDateString && todo.completedDateString >= shiftDate(today, -14))), [todos, today]);
   const activeTodos = tab === "today" ? dayTodos : tab === "upcoming" ? upcoming : recentlyCompleted;
+  const matchesSearch = (todo: Todo) => `${todo.title} ${projectFor(todo.projectId)?.name || ""}`.toLowerCase().includes(taskSearch.trim().toLowerCase());
+  const displayedTodos = activeTodos.filter(matchesSearch);
   const panelTitle = tab === "today" ? (date === today ? "Today's tasks" : readableDate(date)) : tab === "upcoming" ? "Upcoming tasks" : "Recently completed";
   const projectFor = (id: string | null) => projects.find((project) => project.id === id);
   const selectDate = (selected: string) => { setDate(selected); setTab("today"); setCalendarMonth(new Date(`${selected}T12:00:00`)); };
@@ -43,14 +46,15 @@ export default function TodosView({ todos, projects, defaultProjectId, onCreate,
   };
   return <section className="todos-view todos-workspace">
     <div className="todo-page-heading">
-      <div><span className="eyebrow">WORK SMARTER</span><h2>Tasks</h2><p className="muted">Plan your day, connect tasks with projects, and keep momentum.</p></div>
-      <div className="todo-completion"><b>{stats.completedFromPlan}/{stats.planned}</b><small>plan completed</small></div>
+      <div><h2>Tasks</h2><p className="muted">Plan your day, connect tasks with projects, and keep momentum.</p></div>
+      <div className="todo-heading-actions"><label className="todo-global-search"><Search size={15} /><input value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="Search tasks, projects…" aria-label="Search tasks and projects" /></label><button type="button" className="icon-btn" aria-label="Open calendar" onClick={() => selectDate(today)}><CalendarDays size={16} /></button><button type="button" className="icon-btn todo-notification" aria-label="Notifications"><Bell size={16} /><i /></button></div>
     </div>
     <div className="todo-workspace-toolbar">
       <div className="todo-date-nav" aria-label="Task date">
         <button className="icon-btn" type="button" onClick={() => selectDate(shiftDate(date, -1))} aria-label="Previous day"><ChevronLeft size={18} /></button>
-        <button className="outline-btn todo-date-button" type="button" onClick={() => selectDate(today)}><CalendarDays size={15} />{date === today ? "Today" : readableDate(date)}</button>
+        <button className="outline-btn todo-date-button" type="button" onClick={() => selectDate(today)}>{readableDate(date)}</button>
         <button className="icon-btn" type="button" onClick={() => selectDate(shiftDate(date, 1))} aria-label="Next day"><ChevronRight size={18} /></button>
+        <button className="outline-btn todo-calendar-button" type="button" onClick={() => setCalendarMonth(new Date(`${date}T12:00:00`))}><CalendarDays size={15} /> Calendar</button>
       </div>
       <div className="todo-tabs" role="tablist" aria-label="Task views">
         {([ ["today", "Today"], ["upcoming", "Upcoming"], ["completed", "Completed"] ] as const).map(([value, label]) => <button key={value} role="tab" type="button" aria-selected={tab === value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}
@@ -58,21 +62,21 @@ export default function TodosView({ todos, projects, defaultProjectId, onCreate,
     </div>
     {error && <p className="sync-warning">{error}</p>}
     <div className="todo-dashboard-grid">
-      <div className="todo-primary-column">
-        <form className="todo-quick-add" onSubmit={add}>
+      <form className="todo-quick-add" onSubmit={add}>
           <input aria-label="Task title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={240} placeholder="Add a task…" />
           <select aria-label="Project" value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">Select project</option>{projects.filter((project) => project.active).map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select>
           <select aria-label="Priority" value={priority} onChange={(event) => setPriority(event.target.value as TodoPriority)}><option value="high">High priority</option><option value="medium">Medium priority</option><option value="low">Low priority</option></select>
           <button className="start-btn" disabled={saving} type="submit"><Plus size={17} />{saving ? "Adding…" : "Add task"}</button>
-        </form>
+      </form>
+      <div className="todo-primary-column">
         <article className="todo-panel todo-main-panel">
           <div className="todo-panel-head"><div><h3>{panelTitle}</h3><p>{tab === "today" ? `${stats.open} remaining · ${stats.completionPercent}% plan completed` : tab === "upcoming" ? "Your next 7 planned days" : "Finished work from the last 14 days"}</p></div><span>{activeTodos.length} tasks</span></div>
-          {activeTodos.length ? <div className="todo-list">{activeTodos.map((todo) => <TodoRow key={todo.id} todo={todo} project={projectFor(todo.projectId)} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} canMove={todo.status === "open" && todo.plannedDateString !== today} />)}</div> : <div className="todo-empty"><ListTodo size={28} /><h3>No tasks here</h3><p>Add the work you want to finish, or choose another view.</p></div>}
+          {displayedTodos.length ? <div className="todo-list">{displayedTodos.map((todo) => <TodoRow key={todo.id} todo={todo} project={projectFor(todo.projectId)} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} canMove={todo.status === "open" && todo.plannedDateString !== today} />)}</div> : <div className="todo-empty"><ListTodo size={28} /><h3>No tasks here</h3><p>Add the work you want to finish, or choose another view.</p></div>}
         </article>
       </div>
       <aside className="todo-side">
-        <TodoGroup title="Overdue" subtitle="Move these deliberately—nothing is rescheduled automatically." todos={overdue} projects={projects} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} showMove />
-        <TodoGroup title="Recently completed" subtitle="Finished work from the last 14 days." todos={recentlyCompleted.slice(0, 5)} projects={projects} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} />
+        <TodoGroup title="Overdue" subtitle="Move these deliberately—nothing is rescheduled automatically." todos={overdue.filter(matchesSearch)} projects={projects} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} showMove />
+        <TodoGroup title="Recently completed" subtitle="Finished work from the last 14 days." todos={recentlyCompleted.filter(matchesSearch).slice(0, 5)} projects={projects} onToggle={onToggle} onMove={onMove} onDelete={onDelete} onEdit={setEditingTodo} />
       </aside>
       <aside className="todo-calendar-column">
         <TaskCalendar todos={todos} month={calendarMonth} selectedDate={date} onPrevious={() => setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))} onNext={() => setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))} onSelect={selectDate} />
