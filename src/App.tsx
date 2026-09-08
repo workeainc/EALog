@@ -1608,6 +1608,7 @@ export default function App() {
                 </div>
               </div>
                 </section>
+                <div className="overview-bottom-grid">
                 <section className="overview-card overview-projects-card">
               <div className="card-heading">
                 <div>
@@ -1626,7 +1627,8 @@ export default function App() {
                 ))}
               </div>
             </section>
-                <SessionsCard title="Recent sessions" rows={sessionRows.slice(0, 4)} projectName={projectName} projectColor={projectColor} viewAll={() => setView("sessions")} onEdit={openEditLog} onDelete={removeLog} />
+                <OverviewRecentSessions rows={sessionRows.slice(0, 4)} projectName={projectName} projectColor={projectColor} onViewAll={() => setView("sessions")} />
+                </div>
               </div>
               <aside className="overview-aside">
                 <OverviewCalendar todos={todos} onOpenTasks={() => setView("todos")} />
@@ -2215,6 +2217,44 @@ function OverviewCalendar({
       <button className="overview-calendar-open" onClick={onOpenTasks}>
         View tasks →
       </button>
+    </section>
+  );
+}
+
+function OverviewRecentSessions({
+  rows,
+  projectName,
+  projectColor,
+  onViewAll,
+}: {
+  rows: ReturnType<typeof normalizeReportLogs>;
+  projectName: (id: string) => string;
+  projectColor: (id: string) => string;
+  onViewAll: () => void;
+}) {
+  const time = (value: Date) =>
+    value.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return (
+    <section className="overview-card overview-recent-card">
+      <div className="overview-card-head">
+        <div>
+          <span className="overview-title-icon sessions"><Clock3 size={17} /></span>
+          <h3>Recent sessions</h3>
+        </div>
+        <button className="text-btn" onClick={onViewAll}>View all →</button>
+      </div>
+      <div className="overview-recent-list">
+        {rows.length ? rows.map((row, index) => (
+          <button className="overview-recent-row" key={`${row.id || row.date}-${index}`} onClick={onViewAll}>
+            <i style={{ background: projectColor(row.projectId) }} />
+            <span>
+              <b>{projectName(row.projectId)}</b>
+              <small>{time(row.startTime)} – {time(row.endTime)} · {mins(row.durationMinutes)}</small>
+              <em>{row.notes || "No session note"}</em>
+            </span>
+          </button>
+        )) : <div className="overview-empty"><Clock3 size={20} /><span>No completed sessions yet.</span></div>}
+      </div>
     </section>
   );
 }
