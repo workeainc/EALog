@@ -114,9 +114,9 @@ export default function TodosView({
         </div>
         <div className="todo-completion">
           <b>
-            {stats.completed}/{stats.planned}
+            {stats.completedFromPlan}/{stats.planned}
           </b>
-          <small>complete</small>
+          <small>plan complete</small>
         </div>
       </div>
       <div className="todo-date-nav" aria-label="Task date">
@@ -180,7 +180,8 @@ export default function TodosView({
             <div>
               <h3>{date === today ? "Today" : readableDate(date)}</h3>
               <p>
-                {stats.open} remaining · {stats.completionPercent}% complete
+                {stats.open} remaining · {stats.completionPercent}% plan
+                complete · {stats.completedOnDate} completed today
               </p>
             </div>
             <span>{stats.planned} planned</span>
@@ -329,7 +330,9 @@ function TodoRow({
         <b>{todo.title}</b>
         <small>
           <i style={{ background: project?.color || "#999" }} />
-          {project?.name || "Personal / Inbox"} · {todo.priority}
+          {project?.name ||
+            (todo.projectId ? "Deleted project" : "Personal / Inbox")}{" "}
+          · {todo.priority}
           {todo.pendingSync ? " · Syncing…" : ""}
         </small>
       </div>

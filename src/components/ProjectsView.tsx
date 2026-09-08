@@ -336,7 +336,8 @@ export default function ProjectsView({
           <article className="project-dashboard-card project-todo-summary">
             <span className="eyebrow">TODAY’S TASKS</span>
             <h3>
-              {todayTodoStats.completed}/{todayTodoStats.planned} completed
+              {todayTodoStats.completedFromPlan}/{todayTodoStats.planned}{" "}
+              completed
             </h3>
             <p className="muted">
               {todayTodoStats.open
@@ -429,7 +430,7 @@ export default function ProjectsView({
                 <div className="project-day-todos">
                   <h5>Tasks</h5>
                   <p>
-                    {selectedDayTodoStats?.completed || 0}/
+                    {selectedDayTodoStats?.completedFromPlan || 0}/
                     {selectedDayTodoStats?.planned || 0} completed
                   </p>
                   {selectedDayProjectTodos.length ? (

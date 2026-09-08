@@ -16,7 +16,8 @@ export const sortTodos = (todos: Todo[]) =>
 
 export type TodoDayStats = {
   planned: number;
-  completed: number;
+  completedFromPlan: number;
+  completedOnDate: number;
   open: number;
   overdue: number;
   completionPercent: number;
@@ -27,18 +28,22 @@ export const buildTodoDayStats = (
   date: string,
 ): TodoDayStats => {
   const planned = todos.filter((todo) => todo.plannedDateString === date);
-  const completed = planned.filter(
+  const completedFromPlan = planned.filter(
     (todo) => todo.status === "completed",
+  ).length;
+  const completedOnDate = todos.filter(
+    (todo) => todo.completedDateString === date,
   ).length;
   return {
     planned: planned.length,
-    completed,
-    open: planned.length - completed,
+    completedFromPlan,
+    completedOnDate,
+    open: planned.length - completedFromPlan,
     overdue: todos.filter(
       (todo) => todo.status === "open" && todo.plannedDateString < date,
     ).length,
     completionPercent: planned.length
-      ? Math.round((completed / planned.length) * 100)
+      ? Math.round((completedFromPlan / planned.length) * 100)
       : 0,
   };
 };

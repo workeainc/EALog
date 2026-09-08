@@ -231,12 +231,13 @@ export default function App() {
     let disposed = false;
     let offActive: () => void = () => {};
     let offProjects: () => void = () => {};
-    let offTodos: () => void = () => {};
+    const todoUnsubscribers: Array<() => void> = [];
     (async () => {
       try {
-        const [{ auth }, service, authSdk] = await Promise.all([
+        const [{ auth }, service, todoService, authSdk] = await Promise.all([
           import("./lib/firebase"),
           import("./lib/tracker-service"),
+          import("./lib/todo-service"),
           import("firebase/auth"),
         ]);
         // Restore the persisted browser session before deciding whether
@@ -317,13 +318,56 @@ export default function App() {
         todoFrom.setDate(todoFrom.getDate() - 90);
         const todoTo = new Date();
         todoTo.setDate(todoTo.getDate() + 60);
-        offTodos = service.subscribeToTodosForRange(
-          user.uid,
-          localDateKey(todoFrom),
-          localDateKey(todoTo),
-          (items: Todo[]) => {
-            if (!disposed) setTodos(items);
-          },
+        const plannedTodos = new Map<string, Todo>();
+        const overdueTodos = new Map<string, Todo>();
+        const completedTodos = new Map<string, Todo>();
+        const publishTodos = () => {
+          if (!disposed)
+            setTodos(
+              [
+                ...plannedTodos.values(),
+                ...overdueTodos.values(),
+                ...completedTodos.values(),
+              ].filter(
+                (todo, index, items) =>
+                  items.findIndex((item) => item.id === todo.id) === index,
+              ),
+            );
+        };
+        todoUnsubscribers.push(
+          todoService.subscribeToTodosPlannedForRange(
+            user.uid,
+            localDateKey(todoFrom),
+            localDateKey(todoTo),
+            (items: Todo[]) => {
+              plannedTodos.clear();
+              items.forEach((item) => plannedTodos.set(item.id, item));
+              publishTodos();
+            },
+          ),
+        );
+        todoUnsubscribers.push(
+          todoService.subscribeToOpenOverdueTodos(
+            user.uid,
+            localDateKey(),
+            (items: Todo[]) => {
+              overdueTodos.clear();
+              items.forEach((item) => overdueTodos.set(item.id, item));
+              publishTodos();
+            },
+          ),
+        );
+        todoUnsubscribers.push(
+          todoService.subscribeToTodosCompletedForRange(
+            user.uid,
+            localDateKey(todoFrom),
+            localDateKey(todoTo),
+            (items: Todo[]) => {
+              completedTodos.clear();
+              items.forEach((item) => completedTodos.set(item.id, item));
+              publishTodos();
+            },
+          ),
         );
         offActive = service.subscribeToActiveSession(
           user.uid,
@@ -363,7 +407,7 @@ export default function App() {
       disposed = true;
       offActive();
       offProjects();
-      offTodos();
+      todoUnsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [firebaseConfigured]);
   useEffect(() => {
@@ -890,7 +934,7 @@ export default function App() {
     plannedDateString: string;
     priority: TodoPriority;
   }) => {
-    if (tracker && uid) return tracker.createTodo(uid, input);
+    if (uid) return (await import("./lib/todo-service")).createTodo(uid, input);
     const todo: Todo = {
       id: crypto.randomUUID(),
       ...input,
@@ -898,12 +942,19 @@ export default function App() {
       sortOrder: Date.now(),
       completedAt: null,
       completedDateString: null,
+      createdAt: null,
+      updatedAt: null,
+      lastMutationId: crypto.randomUUID(),
     };
     setTodos((items) => [...items, todo]);
   };
   const toggleTodo = async (todo: Todo, complete: boolean) => {
-    if (tracker && uid)
-      return tracker.toggleTodoComplete(uid, todo.id, complete);
+    if (uid)
+      return (await import("./lib/todo-service")).toggleTodoComplete(
+        uid,
+        todo.id,
+        complete,
+      );
     setTodos((items) =>
       items.map((item) =>
         item.id === todo.id
@@ -917,8 +968,10 @@ export default function App() {
     );
   };
   const moveTodo = async (todo: Todo, plannedDateString: string) => {
-    if (tracker && uid)
-      return tracker.updateTodo(uid, todo.id, { plannedDateString });
+    if (uid)
+      return (await import("./lib/todo-service")).updateTodo(uid, todo.id, {
+        plannedDateString,
+      });
     setTodos((items) =>
       items.map((item) =>
         item.id === todo.id ? { ...item, plannedDateString } : item,
@@ -927,7 +980,8 @@ export default function App() {
   };
   const removeTodo = async (todo: Todo) => {
     if (!window.confirm(`Delete “${todo.title}”?`)) return;
-    if (tracker && uid) return tracker.deleteTodo(uid, todo.id);
+    if (uid)
+      return (await import("./lib/todo-service")).deleteTodo(uid, todo.id);
     setTodos((items) => items.filter((item) => item.id !== todo.id));
   };
   const projectColor = (id: string) =>
@@ -1311,7 +1365,7 @@ export default function App() {
                 <div>
                   <span>Today’s tasks</span>
                   <strong>
-                    {todayTodoStats.completed}/{todayTodoStats.planned}
+                    {todayTodoStats.completedFromPlan}/{todayTodoStats.planned}
                   </strong>
                   <small>
                     {todayTodoStats.open

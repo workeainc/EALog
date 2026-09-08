@@ -16,10 +16,11 @@ export interface Todo {
   status: TodoStatus;
   priority: TodoPriority;
   sortOrder: number;
-  completedAt?: Timestamp | null;
-  completedDateString?: string | null;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
+  completedAt: Timestamp | null;
+  completedDateString: string | null;
+  createdAt: Timestamp | null;
+  updatedAt: Timestamp | null;
+  lastMutationId: string;
   /** Local-only indicator supplied by the Firestore snapshot. */
   pendingSync?: boolean;
 }
