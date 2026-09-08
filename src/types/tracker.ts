@@ -6,6 +6,13 @@ export type ProjectStatus =
   "planned" | "active" | "on_hold" | "completed" | "archived";
 export type ProjectPriority = "low" | "medium" | "high";
 
+/** A dated snapshot of a project's work plan. Values apply from the given day. */
+export interface ProjectScheduleEntry {
+  effectiveDate: string;
+  targetMinutes: number;
+  status: ProjectStatus;
+}
+
 export interface Project {
   id: ProjectId;
   name: string;
@@ -20,6 +27,8 @@ export interface Project {
   startDate?: string;
   deadlineDate?: string;
   referenceUrl?: string;
+  /** Historical daily-target/status plan used for accurate monthly pacing. */
+  targetSchedule?: ProjectScheduleEntry[];
 }
 
 /**

@@ -37,6 +37,11 @@ import {
   type Project,
   type TrackerProfile,
 } from "./types/tracker";
+import {
+  localDateKey,
+  nextDateKey,
+  scheduleProjectChange,
+} from "./lib/project-schedule";
 
 const DEMO_PROJECTS: Project[] = [
   {
@@ -745,13 +750,38 @@ export default function App() {
     const form = new FormData(event.currentTarget);
     const targetMinutes = Math.round(Number(form.get("targetMinutes")));
     const status = String(form.get("status"));
+    const effectiveDate = String(form.get("targetEffectiveDate") || "");
+    const startDate = String(form.get("startDate") || "");
     if (!Number.isFinite(targetMinutes) || targetMinutes < 1) {
       setProjectSaveError("Enter a valid daily target.");
+      return;
+    }
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate) ||
+      effectiveDate < nextDateKey()
+    ) {
+      setProjectSaveError(
+        "To protect past reports, plan changes must start tomorrow or later.",
+      );
       return;
     }
     setSavingProject(true);
     setProjectSaveError("");
     try {
+      const earliestLogDate = normalizeReportLogs(recentLogs, timezone)
+        .filter((row) => row.projectId === editingProject.id)
+        .sort((a, b) => a.date.localeCompare(b.date))[0]?.date;
+      const baselineDate =
+        startDate ||
+        editingProject.startDate ||
+        earliestLogDate ||
+        localDateKey();
+      const targetSchedule = scheduleProjectChange(editingProject, {
+        effectiveDate,
+        targetMinutes,
+        status: status as NonNullable<Project["status"]>,
+        baselineDate,
+      });
       await tracker.updateProject(uid, {
         ...editingProject,
         name: String(form.get("name") || "").trim() || editingProject.name,
@@ -760,10 +790,11 @@ export default function App() {
         clientName: String(form.get("clientName") || "").trim(),
         status: status as Project["status"],
         priority: String(form.get("priority")) as Project["priority"],
-        startDate: String(form.get("startDate") || ""),
+        startDate,
         deadlineDate: String(form.get("deadlineDate") || ""),
         referenceUrl: String(form.get("referenceUrl") || "").trim(),
         active: status === "active",
+        targetSchedule,
       });
       setEditingProject(null);
     } catch (error: any) {
@@ -785,7 +816,20 @@ export default function App() {
     )
       return;
     try {
-      await tracker.setProjectStatus(uid, project, status);
+      const earliestLogDate = normalizeReportLogs(recentLogs, timezone)
+        .filter((row) => row.projectId === project.id)
+        .sort((a, b) => a.date.localeCompare(b.date))[0]?.date;
+      await tracker.updateProject(uid, {
+        ...project,
+        status,
+        active: status === "active",
+        targetSchedule: scheduleProjectChange(project, {
+          effectiveDate: nextDateKey(),
+          targetMinutes: project.targetMinutes,
+          status,
+          baselineDate: project.startDate || earliestLogDate || localDateKey(),
+        }),
+      });
     } catch (error: any) {
       setSyncError(error?.message || "Could not update project status.");
     }
@@ -1524,6 +1568,20 @@ export default function App() {
                   <option value="completed">Completed</option>
                   <option value="archived">Archived</option>
                 </select>
+              </label>
+              <label className="modal-field">
+                PLAN CHANGE STARTS
+                <input
+                  name="targetEffectiveDate"
+                  type="date"
+                  defaultValue={nextDateKey()}
+                  min={nextDateKey()}
+                  required
+                />
+                <small>
+                  Target and status apply from this date onward. Past reports
+                  stay unchanged.
+                </small>
               </label>
               <label className="modal-field">
                 PRIORITY

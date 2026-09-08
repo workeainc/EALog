@@ -14,6 +14,7 @@ import {
   normalizeReportLogs,
   type ReportLog,
 } from "../lib/reports";
+import { getMonthPlan } from "../lib/project-schedule";
 import type { Project, ProjectStatus } from "../types/tracker";
 
 type Props = {
@@ -102,16 +103,21 @@ export default function ProjectsView({
     const monthlyMinutes = projectSessions
       .filter((session) => session.date.startsWith(monthPrefix))
       .reduce((sum, session) => sum + session.durationMinutes, 0);
-    const expectedMinutes = selected.targetMinutes * now.getDate();
-    const monthTargetMinutes = selected.targetMinutes * daysInMonth;
+    const monthPlan = getMonthPlan(
+      selected,
+      now,
+      selected.startDate || `${monthPrefix}-01`,
+    );
+    const expectedMinutes = monthPlan.expectedMinutes;
+    const monthTargetMinutes = monthPlan.totalTargetMinutes;
     const paceDifference = monthlyMinutes - expectedMinutes;
     const progressPercent = Math.min(
       100,
-      (monthlyMinutes / monthTargetMinutes) * 100,
+      monthTargetMinutes ? (monthlyMinutes / monthTargetMinutes) * 100 : 0,
     );
     const expectedPercent = Math.min(
       100,
-      (expectedMinutes / monthTargetMinutes) * 100,
+      monthTargetMinutes ? (expectedMinutes / monthTargetMinutes) * 100 : 0,
     );
     return (
       <section className="project-dashboard">
@@ -173,7 +179,7 @@ export default function ProjectsView({
               </h3>
               <p>
                 {formatMinutes(monthlyMinutes)} tracked of{" "}
-                {formatMinutes(monthTargetMinutes)} monthly target
+                {formatMinutes(monthTargetMinutes)} planned target
               </p>
             </div>
             <div className="project-month-pace">
@@ -198,7 +204,9 @@ export default function ProjectsView({
           <div className="project-month-progress-foot">
             <span>
               Day {now.getDate()} of {daysInMonth} ·{" "}
-              {formatMinutes(selected.targetMinutes)} daily target
+              {monthPlan.activeTargetDays} target day
+              {monthPlan.activeTargetDays === 1 ? "" : "s"}
+              {monthPlan.onHoldDays ? ` · ${monthPlan.onHoldDays} on hold` : ""}
             </span>
             <b className={paceDifference >= 0 ? "ahead" : "behind"}>
               {paceDifference >= 0 ? "+" : "−"}

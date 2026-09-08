@@ -32,6 +32,7 @@ import {
   type ActiveSession,
   type Project,
   type ProjectId,
+  type ProjectScheduleEntry,
   type ProjectStatus,
   type TrackerProfile,
   type WorkLog,
@@ -47,6 +48,37 @@ const PROJECT_COLORS = [
   "#0ea5e9",
   "#8b5cf6",
 ];
+const projectStatuses = [
+  "planned",
+  "active",
+  "on_hold",
+  "completed",
+  "archived",
+] as const;
+const isDateKey = (value: unknown): value is string =>
+  typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+const cleanProjectSchedule = (value: unknown): ProjectScheduleEntry[] => {
+  if (!Array.isArray(value)) return [];
+  const byDate = new Map<string, ProjectScheduleEntry>();
+  for (const entry of value) {
+    if (
+      !entry ||
+      !isDateKey(entry.effectiveDate) ||
+      !Number.isFinite(entry.targetMinutes) ||
+      entry.targetMinutes < 1 ||
+      !projectStatuses.includes(entry.status)
+    )
+      continue;
+    byDate.set(entry.effectiveDate, {
+      effectiveDate: entry.effectiveDate,
+      targetMinutes: Math.round(entry.targetMinutes),
+      status: entry.status,
+    });
+  }
+  return [...byDate.values()].sort((a, b) =>
+    a.effectiveDate.localeCompare(b.effectiveDate),
+  );
+};
 const userRef = (uid: string) => doc(db, "users", uid);
 const projectsRef = (uid: string) => collection(userRef(uid), "projects");
 const logsRef = (uid: string) => collection(userRef(uid), "work_logs");
@@ -368,6 +400,7 @@ export function subscribeToProjects(
             typeof value.deadlineDate === "string" ? value.deadlineDate : "",
           referenceUrl:
             typeof value.referenceUrl === "string" ? value.referenceUrl : "",
+          targetSchedule: cleanProjectSchedule(value.targetSchedule),
         } satisfies Project;
       });
       callback(projects);
@@ -401,6 +434,13 @@ export async function createProject(
     active: true,
     color: PROJECT_COLORS[sortOrder % PROJECT_COLORS.length],
     sortOrder,
+    targetSchedule: [
+      {
+        effectiveDate: toDateString(new Date()),
+        targetMinutes,
+        status: "active",
+      },
+    ],
   };
   await setDoc(doc(projectsRef(uid), id), { ...project, id: undefined });
   return project;
