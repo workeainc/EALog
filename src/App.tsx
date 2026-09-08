@@ -8,6 +8,7 @@ import {
   CircleHelp,
   Clock3,
   Download,
+  Flame,
   FolderKanban,
   LayoutDashboard,
   ListTodo,
@@ -17,7 +18,9 @@ import {
   Pencil,
   Settings,
   Square,
+  Target,
   Timer,
+  Trophy,
   Trash2,
   TrendingUp,
   X,
@@ -531,8 +534,16 @@ export default function App() {
       activeProjects.map((project) => ({
         ...project,
         completed: todayAggregate.byProject[project.id] || 0,
+        todoStats: buildTodoDayStats(
+          todos.filter(
+            (todo) =>
+              todo.projectId === project.id &&
+              todo.plannedDateString === localDateKey(),
+          ),
+          localDateKey(),
+        ),
       })),
-    [activeProjects, todayAggregate.byProject],
+    [activeProjects, todayAggregate.byProject, todos],
   );
   const average = todayAggregate.sessionCount
     ? Math.round(todayAggregate.totalMinutes / todayAggregate.sessionCount)
@@ -541,6 +552,35 @@ export default function App() {
     () => buildTodoDayStats(todos, localDateKey()),
     [todos],
   );
+  const todayFocusTodos = useMemo(
+    () =>
+      sortTodos(
+        todos.filter(
+          (todo) =>
+            todo.status === "open" && todo.plannedDateString === localDateKey(),
+        ),
+      ).slice(0, 3),
+    [todos],
+  );
+  const overdueTodos = useMemo(
+    () =>
+      todos.filter(
+        (todo) =>
+          todo.status === "open" && todo.plannedDateString < localDateKey(),
+      ),
+    [todos],
+  );
+  const dailyProgressPercent = dailyTarget
+    ? Math.min(100, (todayAggregate.totalMinutes / dailyTarget) * 100)
+    : 0;
+  const dailyProgressLabel =
+    dailyProgressPercent >= 100
+      ? "Target achieved"
+      : dailyProgressPercent >= 60
+        ? "On track"
+        : dailyProgressPercent >= 30
+          ? "In progress"
+          : "Just getting started";
   const weekAggregate = useMemo(
     () => aggregateReportRows(normalizeReportLogs(weekLogs), timezone),
     [weekLogs, timezone],
@@ -1392,87 +1432,39 @@ export default function App() {
                             : "Workspace synced. Backups are up to date."}
               </div>
             )}
-            <section className="stats-grid">
-              <div className="stat-card accent">
-                <div className="stat-icon">
-                  <Timer size={19} />
-                </div>
-                <div>
-                  <span>Total tracked</span>
-                  <strong>{mins(todayAggregate.totalMinutes)}</strong>
-                  <small>
-                    <TrendingUp size={13} /> Completed sessions only
-                  </small>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon orange">
-                  <CalendarDays size={19} />
-                </div>
-                <div>
-                  <span>Daily target</span>
-                  <strong>
-                    {mins(dailyTarget)}{" "}
-                    <em>/ {mins(todayAggregate.totalMinutes)}</em>
-                  </strong>
-                  <div className="mini-track">
-                    <i
-                      style={{
-                        width: `${dailyTarget ? Math.min(100, (todayAggregate.totalMinutes / dailyTarget) * 100) : 0}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-              <button
-                className="stat-card todo-stat-card"
-                onClick={() => setView("todos")}
-              >
-                <div className="stat-icon purple">
-                  <ListTodo size={19} />
-                </div>
-                <div>
-                  <span>Today’s tasks</span>
-                  <strong>
-                    {todayTodoStats.completedFromPlan}/{todayTodoStats.planned}
-                  </strong>
-                  <small>
-                    {todayTodoStats.open
-                      ? `${todayTodoStats.open} remaining`
-                      : todayTodoStats.planned
-                        ? "All completed"
-                        : "Plan your day"}
-                  </small>
-                </div>
+            <section className="overview-kpi-grid">
+              <OverviewKpi icon={<Timer size={19} />} label="Total tracked" value={mins(todayAggregate.totalMinutes)} detail="Completed sessions today" tone="blue" />
+              <OverviewKpi icon={<Target size={19} />} label="Daily target" value={mins(dailyTarget)} detail={`${Math.round(dailyProgressPercent)}% complete`} tone="purple" progress={dailyProgressPercent} />
+              <button className="overview-kpi overview-kpi-button" onClick={() => setView("todos")}>
+                <span className="overview-kpi-icon green"><ListTodo size={19} /></span><span><small>Today’s tasks</small><strong>{todayTodoStats.completedFromPlan} / {todayTodoStats.planned}</strong><em>{todayTodoStats.open ? `${todayTodoStats.open} remaining` : todayTodoStats.planned ? "All completed" : "Plan your day"}</em></span>
               </button>
-              <div className="stat-card">
-                <div className="stat-icon green">
-                  <BarChart3 size={19} />
-                </div>
-                <div>
-                  <span>Sessions</span>
-                  <strong>{todayAggregate.sessionCount}</strong>
-                  <small>
-                    Across {Object.keys(todayAggregate.byProject).length}{" "}
-                    project
-                    {Object.keys(todayAggregate.byProject).length === 1
-                      ? ""
-                      : "s"}
-                  </small>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon blue">
-                  <Clock3 size={19} />
-                </div>
-                <div>
-                  <span>Avg. session</span>
-                  <strong>{mins(average)}</strong>
-                  <small>Completed sessions only</small>
-                </div>
-              </div>
+              <OverviewKpi icon={<BarChart3 size={19} />} label="Sessions" value={String(todayAggregate.sessionCount)} detail="Completed today" tone="pink" />
+              <OverviewKpi icon={<Clock3 size={19} />} label="Avg. session" value={mins(average)} detail="Completed sessions only" tone="indigo" />
             </section>
-            <section className="work-grid">
+            <section className="overview-layout">
+              <div className="overview-main-column">
+                <div className="overview-focus-grid">
+                  <section className="overview-card focus-card">
+                    <div className="overview-card-head"><div><span className="overview-title-icon flame"><Flame size={17} /></span><h3>Today’s focus</h3></div><button className="text-btn" onClick={() => setView("todos")}>View all tasks →</button></div>
+                    <div className="focus-list">
+                      {todayFocusTodos.length ? todayFocusTodos.map((todo, index) => (
+                        <div className="focus-row" key={todo.id}>
+                          <span className="focus-number">{index + 1}</span>
+                          <button className="focus-check" onClick={() => void toggleTodo(todo, true)} aria-label={`Complete ${todo.title}`} />
+                          <div><b>{todo.title}</b><small><i style={{ background: projectColor(todo.projectId || "") }} />{projectName(todo.projectId || "Personal")} <em className={`priority-${todo.priority}`}>{todo.priority}</em></small></div>
+                        </div>
+                      )) : <div className="overview-empty"><ListTodo size={20} /><span>No tasks planned for today.</span><button className="text-btn" onClick={() => setView("todos")}>Plan tasks →</button></div>}
+                    </div>
+                    <div className="focus-footer"><span>{todayTodoStats.open} remaining</span><button className="text-btn" onClick={() => setView("todos")}>Open Tasks →</button></div>
+                  </section>
+                  <section className="overview-card progress-hero-card">
+                    <div className="overview-card-head"><div><span className="overview-title-icon target"><Target size={17} /></span><h3>Today’s progress</h3></div><span className={`progress-status ${dailyProgressPercent >= 100 ? "complete" : ""}`}>{dailyProgressLabel}</span></div>
+                    <div className="progress-hero-value"><strong>{mins(todayAggregate.totalMinutes)}</strong><span>/ {mins(dailyTarget)}</span></div>
+                    <p>tracked time</p><div className="overview-progress-track"><i style={{ width: `${dailyProgressPercent}%` }} /></div><div className="progress-hero-foot"><b>{Math.round(dailyProgressPercent)}%</b><span>{dailyTarget > todayAggregate.totalMinutes ? `${mins(dailyTarget - todayAggregate.totalMinutes)} remaining` : "Daily goal completed"}</span></div>
+                    <div className="progress-cheer"><Trophy size={19} /><div><b>{dailyProgressPercent >= 100 ? "Great work!" : "Keep your momentum"}</b><span>{dailyProgressPercent >= 100 ? "You have reached today’s target." : "Every focused session moves the day forward."}</span></div></div>
+                  </section>
+                </div>
+                <section className="overview-work-grid">
               <div className="timer-card">
                 <div className="card-heading">
                   <div>
@@ -1615,67 +1607,32 @@ export default function App() {
                   </b>
                 </div>
               </div>
-            </section>
-            <section className="projects-card">
+                </section>
+                <section className="overview-card overview-projects-card">
               <div className="card-heading">
                 <div>
-                  <h3>Project progress</h3>
-                  <p className="muted">Daily target completion</p>
+                  <div className="overview-card-title"><span className="overview-title-icon target"><Target size={17} /></span><div><h3>Today’s projects</h3><p className="muted">Time and task completion by project</p></div></div>
                 </div>
-                <button
-                  className="add-btn"
-                  onClick={() => {
-                    setAddProjectError("");
-                    setShowAddProject(true);
-                  }}
-                >
-                  <Plus size={16} /> Add project
-                </button>
+                <button className="text-btn" onClick={() => { setProjectDashboardId(null); setView("projects"); }}>View all projects →</button>
               </div>
-              <div className="project-list">
+              <div className="overview-project-list">
                 {progress.map((project) => (
-                  <div className="project-row" key={project.id}>
-                    <div className="project-name">
-                      <i
-                        style={{
-                          background: project.color,
-                        }}
-                      />
-                      <b>{project.name}</b>
-                    </div>
-                    <div className="progress-line">
-                      <div>
-                        <i
-                          style={{
-                            width: `${Math.min(100, (project.completed / project.targetMinutes) * 100)}%`,
-                            background: project.color,
-                          }}
-                        />
-                      </div>
-                      <span>
-                        {mins(project.completed)}{" "}
-                        <em>/ {mins(project.targetMinutes)}</em>
-                      </span>
-                    </div>
-                    <strong className="percent">
-                      {Math.round(
-                        (project.completed / project.targetMinutes) * 100,
-                      )}
-                      %
-                    </strong>
-                  </div>
+                  <button className="overview-project-row" key={project.id} onClick={() => { setProjectDashboardId(project.id); setView("projects"); }}>
+                    <i className="project-row-dot" style={{ background: project.color }} />
+                    <div className="overview-project-name"><b>{project.name}</b><span>{mins(project.completed)} / {mins(project.targetMinutes)}</span></div>
+                    <div className="overview-project-progress"><div><i style={{ width: `${Math.min(100, (project.completed / project.targetMinutes) * 100)}%`, background: project.color }} /></div><small>{Math.round((project.completed / project.targetMinutes) * 100)}%</small></div>
+                    <div className="overview-project-tasks"><span>Tasks</span><b>{project.todoStats.completedFromPlan} / {project.todoStats.planned}</b></div>
+                  </button>
                 ))}
               </div>
             </section>
-            <SessionsCard
-              title="Recent sessions"
-              rows={sessionRows.slice(0, 4)}
-              projectName={projectName}
-              projectColor={projectColor}
-              viewAll={() => setView("sessions")}
-              onEdit={openEditLog}
-              onDelete={removeLog}
-            />
+                <SessionsCard title="Recent sessions" rows={sessionRows.slice(0, 4)} projectName={projectName} projectColor={projectColor} viewAll={() => setView("sessions")} onEdit={openEditLog} onDelete={removeLog} />
+              </div>
+              <aside className="overview-aside">
+                <OverviewCalendar todos={todos} onOpenTasks={() => setView("todos")} />
+                <section className="overview-card attention-card"><div className="overview-card-head"><div><span className="overview-title-icon warning"><Bell size={17} /></span><h3>Needs attention</h3></div></div>{overdueTodos.length ? <><div className="attention-line"><b>{overdueTodos.length} overdue task{overdueTodos.length === 1 ? "" : "s"}</b><button className="text-btn" onClick={() => setView("todos")}>View all →</button></div>{overdueTodos.slice(0, 2).map((todo) => <div className="attention-task" key={todo.id}><i /><span>{todo.title}<small>{projectName(todo.projectId || "Personal")} · planned {todo.plannedDateString}</small></span></div>)}</> : <div className="overview-empty attention-clear"><Trophy size={20} /><span>All clear — no overdue tasks.</span></div>}{progress.some((project) => project.completed < project.targetMinutes) && <div className="attention-pace"><b>Daily pace</b><span>{progress.filter((project) => project.completed < project.targetMinutes).length} project{progress.filter((project) => project.completed < project.targetMinutes).length === 1 ? " needs" : "s need"} more focused time today.</span></div>}</section>
+              </aside>
+            </section>
           </>
         )}
       </main>
@@ -2151,6 +2108,113 @@ function MonthlyMap({
           );
         })}
       </div>
+    </section>
+  );
+}
+
+function OverviewKpi({
+  icon,
+  label,
+  value,
+  detail,
+  tone,
+  progress,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  tone: string;
+  progress?: number;
+}) {
+  return (
+    <div className="overview-kpi">
+      <span className={`overview-kpi-icon ${tone}`}>{icon}</span>
+      <div>
+        <small>{label}</small>
+        <strong>{value}</strong>
+        {progress !== undefined ? (
+          <div className="overview-kpi-progress">
+            <i style={{ width: `${progress}%` }} />
+            <em>{detail}</em>
+          </div>
+        ) : (
+          <em>{detail}</em>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OverviewCalendar({
+  todos,
+  onOpenTasks,
+}: {
+  todos: Todo[];
+  onOpenTasks: () => void;
+}) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const first = new Date(year, month, 1);
+  const days = new Date(year, month + 1, 0).getDate();
+  const offset = (first.getDay() + 6) % 7;
+  const keyFor = (day: number) =>
+    localDateKey(new Date(year, month, day, 12, 0, 0));
+  return (
+    <section className="overview-card overview-calendar-card">
+      <div className="overview-card-head">
+        <div>
+          <span className="overview-title-icon calendar"><CalendarDays size={17} /></span>
+          <h3>Calendar</h3>
+        </div>
+      </div>
+      <h4>
+        {now.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
+      </h4>
+      <div className="overview-calendar-weekdays">
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="overview-calendar-grid">
+        {Array.from({ length: offset + days }, (_, index) => {
+          if (index < offset) return <span key={`blank-${index}`} />;
+          const day = index - offset + 1;
+          const key = keyFor(day);
+          const planned = todos.some((todo) => todo.plannedDateString === key);
+          const completed = todos.some(
+            (todo) => todo.completedDateString === key,
+          );
+          const overdue = todos.some(
+            (todo) => todo.status === "open" && todo.plannedDateString === key && key < localDateKey(),
+          );
+          return (
+            <button
+              key={key}
+              type="button"
+              className={key === localDateKey() ? "today" : ""}
+              onClick={onOpenTasks}
+              aria-label={`Open tasks for ${key}`}
+            >
+              <b>{day}</b>
+              <i>
+                {planned && <span className="planned" />}
+                {completed && <span className="completed" />}
+                {overdue && <span className="overdue" />}
+              </i>
+            </button>
+          );
+        })}
+      </div>
+      <div className="overview-calendar-legend">
+        <span><i className="planned" /> Planned</span>
+        <span><i className="completed" /> Completed</span>
+        <span><i className="overdue" /> Overdue</span>
+      </div>
+      <button className="overview-calendar-open" onClick={onOpenTasks}>
+        View tasks →
+      </button>
     </section>
   );
 }

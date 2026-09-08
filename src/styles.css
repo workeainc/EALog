@@ -2610,6 +2610,92 @@ td {
   }
 }
 
+/* Overview command centre */
+.overview-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.overview-kpi {
+  display: flex;
+  gap: 11px;
+  min-height: 116px;
+  padding: 15px;
+  border: 1px solid #dce7f5;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 6px 18px #2c629b0c;
+}
+.overview-kpi-button {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+.overview-kpi-button:hover { border-color: #9bbaf1; box-shadow: 0 8px 20px #2c629b14; transform: translateY(-1px); }
+.overview-kpi-icon,
+.overview-title-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: #e9efff;
+  color: #4e61df;
+}
+.overview-kpi-icon { width: 34px; height: 34px; }
+.overview-kpi-icon.purple { background: #f0e9ff; color: #8955e8; }
+.overview-kpi-icon.green { background: #e4f9f0; color: #23a56f; }
+.overview-kpi-icon.pink { background: #fceafd; color: #b34dcc; }
+.overview-kpi-icon.indigo { background: #eeeeff; color: #584ce1; }
+.overview-kpi small,
+.overview-kpi em { display: block; color: #65809e; font-size: 10px; font-style: normal; }
+.overview-kpi strong { display: block; margin: 8px 0 5px; color: #162b4e; font: 800 22px Manrope; white-space: nowrap; }
+.overview-kpi-progress { display: flex; align-items: center; gap: 6px; }
+.overview-kpi-progress::before { content: ""; width: 56px; height: 5px; border-radius: 99px; background: #e6edf8; }
+.overview-kpi-progress { position: relative; }
+.overview-kpi-progress i { position: absolute; left: 0; top: 0; height: 5px; border-radius: 99px; background: #6254ec; }
+.overview-kpi-progress em { margin-left: 1px; }
+.overview-layout { display: grid; grid-template-columns: minmax(0, 1fr) 285px; gap: 15px; align-items: start; }
+.overview-main-column { display: grid; gap: 15px; min-width: 0; }
+.overview-focus-grid,
+.overview-work-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 15px; }
+.overview-card { border: 1px solid #dce7f5; border-radius: 12px; background: #fff; box-shadow: 0 6px 18px #2c629b0c; }
+.overview-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.overview-card-head > div,
+.overview-card-title { display: flex; align-items: center; gap: 9px; }
+.overview-card-head h3 { margin: 0; color: #182d50; font-size: 15px; }
+.overview-title-icon { width: 31px; height: 31px; }
+.overview-title-icon.flame { background: #fff1dc; color: #f39c23; }
+.overview-title-icon.target { background: #eeeaff; color: #7059e9; }
+.overview-title-icon.calendar { background: #e9f0ff; color: #4d63dc; }
+.overview-title-icon.warning { background: #fff0ee; color: #e66d56; }
+.focus-card,
+.progress-hero-card { min-height: 260px; padding: 17px; }
+.focus-list { display: grid; margin-top: 11px; }
+.focus-row { display: grid; grid-template-columns: 22px 19px minmax(0, 1fr); align-items: center; gap: 10px; min-height: 54px; border-top: 1px solid #edf1f7; }
+.focus-number { display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; background: #5c5be5; color: #fff; font-size: 10px; font-weight: 700; }
+.focus-check { width: 16px; height: 16px; border: 1.5px solid #aabbd0; border-radius: 4px; background: #fff; cursor: pointer; transition: border-color .16s, background .16s; }
+.focus-check:hover { border-color: #5d61e9; background: #f0f1ff; }
+.focus-row b { display: block; overflow: hidden; color: #263b59; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.focus-row small { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: #72879e; font-size: 10px; }
+.focus-row small i { width: 6px; height: 6px; border-radius: 50%; }
+.focus-row small em { border-radius: 99px; padding: 2px 5px; font-size: 9px; font-style: normal; text-transform: capitalize; }
+.priority-high { color: #dc5162; background: #fff0f1; }.priority-medium { color: #bd821d; background: #fff7df; }.priority-low { color: #218d63; background: #e7f8ef; }
+.focus-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 10px; border-top: 1px solid #edf1f7; color: #288d66; font-size: 11px; font-weight: 700; }
+.progress-status { border-radius: 99px; padding: 5px 8px; background: #e9f8f0; color: #249566; font-size: 10px; font-weight: 700; }.progress-status.complete { background: #eaf0ff; color: #5061d3; }
+.progress-hero-value { display: flex; align-items: baseline; gap: 6px; margin-top: 31px; }.progress-hero-value strong { color: #18345f; font: 800 29px Manrope; }.progress-hero-value span { color: #718bb0; font-size: 17px; font-weight: 700; }
+.progress-hero-card > p { margin: 0 0 17px; color: #6781a4; font-size: 11px; }.overview-progress-track { height: 12px; overflow: hidden; border-radius: 99px; background: #e8eef9; }.overview-progress-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #5a51ed, #8069f2); }
+.progress-hero-foot { display: flex; justify-content: space-between; margin-top: 9px; color: #4d6485; font-size: 11px; }.progress-hero-foot b { color: #4c54dc; }.progress-cheer { display: flex; gap: 9px; align-items: center; margin-top: 18px; padding: 11px; border-radius: 10px; background: #f3f7ff; color: #24a470; }.progress-cheer div { display: grid; gap: 2px; }.progress-cheer b { font-size: 11px; }.progress-cheer span { color: #6c82a1; font-size: 10px; }
+.overview-work-grid { grid-template-columns: minmax(290px, .9fr) minmax(340px, 1.1fr); }.overview-work-grid .timer-card,.overview-work-grid .chart-card { border-color: #dce7f5; border-radius: 12px; box-shadow: 0 6px 18px #2c629b0c; }.overview-work-grid .timer-card { min-height: 300px; }.overview-work-grid .chart-card { min-height: 300px; }
+.overview-projects-card { padding: 18px; }.overview-project-list { display: grid; margin-top: 10px; }.overview-project-row { display: grid; grid-template-columns: 12px minmax(100px, .65fr) minmax(130px, 1.3fr) 70px; gap: 10px; align-items: center; width: 100%; min-height: 59px; border: 0; border-top: 1px solid #edf1f7; background: transparent; color: inherit; cursor: pointer; text-align: left; transition: background .16s ease; }.overview-project-row:hover { background: #f7faff; }.project-row-dot { width: 9px; height: 9px; border-radius: 50%; }.overview-project-name b,.overview-project-name span { display: block; }.overview-project-name b { color: #284261; font-size: 12px; }.overview-project-name span { margin-top: 4px; color: #7288a2; font-size: 10px; }.overview-project-progress { display: flex; align-items: center; gap: 8px; }.overview-project-progress > div { flex: 1; height: 6px; overflow: hidden; border-radius: 99px; background: #e7edf7; }.overview-project-progress i { display: block; height: 100%; border-radius: inherit; }.overview-project-progress small { color: #537097; font-size: 10px; font-weight: 700; }.overview-project-tasks span,.overview-project-tasks b { display: block; }.overview-project-tasks span { color: #8294aa; font-size: 9px; }.overview-project-tasks b { color: #279567; font-size: 11px; }
+.overview-aside { display: grid; gap: 15px; }.overview-calendar-card { padding: 16px; }.overview-calendar-card h4 { margin: 14px 0 12px; color: #243c5f; font-size: 14px; }.overview-calendar-weekdays,.overview-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }.overview-calendar-weekdays { color: #7590b0; font-size: 9px; text-align: center; }.overview-calendar-grid { margin-top: 7px; }.overview-calendar-grid button { display: grid; place-items: center; min-height: 30px; border: 0; border-radius: 50%; background: transparent; color: #355276; cursor: pointer; font: 600 10px "DM Sans"; }.overview-calendar-grid button:hover { background: #edf3ff; }.overview-calendar-grid button.today { background: linear-gradient(135deg, #5a5deb, #5752d8); box-shadow: 0 4px 10px #5859da45; color: #fff; }.overview-calendar-grid button i { display: flex; gap: 2px; min-height: 4px; margin-top: 1px; }.overview-calendar-grid button i span,.overview-calendar-legend i { width: 4px; height: 4px; border-radius: 50%; }.planned { background: #705bea; }.completed { background: #22a875; }.overdue { background: #ed6670; }.overview-calendar-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; color: #7188a5; font-size: 9px; }.overview-calendar-legend span { display: inline-flex; align-items: center; gap: 3px; }.overview-calendar-open { width: 100%; margin-top: 13px; border: 1px solid #dce7f5; border-radius: 8px; background: #f3f7ff; color: #4d63c8; cursor: pointer; font: 700 11px "DM Sans"; padding: 9px; }
+.attention-card { padding: 16px; }.attention-line { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 8px; color: #dc5664; font-size: 11px; }.attention-task { display: flex; gap: 8px; align-items: flex-start; padding: 8px 0; border-top: 1px solid #edf1f7; color: #38516f; font-size: 11px; }.attention-task > i { width: 7px; height: 7px; margin-top: 4px; border-radius: 50%; background: #ef6870; }.attention-task span { display: grid; gap: 3px; }.attention-task small { color: #889bb0; font-size: 9px; }.attention-pace { display: grid; gap: 4px; margin-top: 10px; padding: 10px; border-radius: 9px; background: #fff8e8; color: #a6751b; font-size: 10px; }.attention-pace span { color: #8e7d5d; }.overview-empty { display: flex; align-items: center; gap: 8px; min-height: 78px; color: #7187a3; font-size: 11px; }.overview-empty .text-btn { margin-left: auto; }.attention-clear { min-height: 80px; color: #29966b; }
+@media (max-width: 1320px) { .overview-kpi-grid { grid-template-columns: repeat(3, 1fr); }.overview-layout { grid-template-columns: 1fr; }.overview-aside { grid-template-columns: 1fr 1fr; }.overview-calendar-card { grid-column: auto; } }
+@media (max-width: 850px) { .overview-focus-grid,.overview-work-grid { grid-template-columns: 1fr; }.overview-aside { grid-template-columns: 1fr; }.overview-project-row { grid-template-columns: 12px minmax(100px, .7fr) minmax(130px, 1.3fr) 60px; } }
+@media (max-width: 580px) { .overview-kpi-grid { grid-template-columns: 1fr 1fr; gap: 9px; }.overview-kpi { min-height: 103px; padding: 12px; gap: 8px; }.overview-kpi strong { font-size: 18px; }.overview-kpi-icon { width: 29px; height: 29px; }.overview-project-row { grid-template-columns: 10px 1fr 48px; padding: 8px 0; }.overview-project-progress { grid-column: 2 / 4; }.overview-project-tasks { display: none; }.overview-calendar-grid button { min-height: 34px; } }
+
 /* Three-column Smart Todo workspace */
 .todos-workspace {
   gap: 13px;
