@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { strToU8, zipSync } from "fflate";
 import { parseVaultImportFile } from "./vault-import";
 
 describe("vault import", () => {
@@ -13,5 +14,17 @@ describe("vault import", () => {
   it("rejects legacy workbook file formats instead of attempting unsafe parsing", async () => {
     const file = new File(["not a workbook"], "legacy.xls");
     await expect(parseVaultImportFile(file)).rejects.toThrow("CSV or .xlsx");
+  });
+
+  it("parses an Office-style XLSX workbook with shared strings", async () => {
+    const file = new File([zipSync({
+      "xl/workbook.xml": strToU8('<workbook xmlns:r="x"><sheets><sheet name="Accounts" r:id="rId1"/></sheets></workbook>'),
+      "xl/_rels/workbook.xml.rels": strToU8('<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>'),
+      "xl/sharedStrings.xml": strToU8("<sst><si><t>Site</t></si><si><t>Password</t></si><si><t>Example</t></si><si><t>secret</t></si></sst>"),
+      "xl/worksheets/sheet1.xml": strToU8('<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row><row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c></row></sheetData></worksheet>'),
+    })], "accounts.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const [sheet] = await parseVaultImportFile(file);
+    expect(sheet.category).toBe("Accounts");
+    expect(sheet.rows).toEqual([{ Site: "Example", Password: "secret" }]);
   });
 });
