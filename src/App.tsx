@@ -166,7 +166,7 @@ export default function App() {
   const [summary, setSummary] = useState("");
   const [sessionTodoIds, setSessionTodoIds] = useState<string[]>([]);
   const [notedSessionTodoIds, setNotedSessionTodoIds] = useState<string[]>([]);
-  const [allOpenTodos, setAllOpenTodos] = useState<Todo[]>([]);
+  const [finishProjectId, setFinishProjectId] = useState<string | null>(null);
   const [finishingSession, setFinishingSession] = useState(false);
   const [todayLogs, setTodayLogs] = useState<ReportLog[]>(
     firebaseConfigured ? [] : DEMO_LOGS,
@@ -423,9 +423,6 @@ export default function App() {
           ),
         );
         todoUnsubscribers.push(
-          todoService.subscribeToOpenTodos(user.uid, setAllOpenTodos),
-        );
-        todoUnsubscribers.push(
           todoService.subscribeToTodosCompletedForRange(
             user.uid,
             localDateKey(todoFrom),
@@ -465,6 +462,9 @@ export default function App() {
             }
           },
         );
+        // Listener setup succeeded. Do not keep a stale operation error
+        // (for example from an older PWA bundle) on an otherwise synced app.
+        setSyncError("");
         setDataLoading(false);
       } catch (error: any) {
         if (!disposed)
@@ -555,20 +555,10 @@ export default function App() {
   }, []);
 
   const selectedProject = projects.find((project) => project.id === selectedId);
+  const finishProject = projects.find((project) => project.id === (finishProjectId || selectedId));
   const sessionOpenTodos = useMemo(
-    () => {
-      // The dashboard stream already contains today's tasks, while the
-      // unbounded stream covers tasks outside its visible date range. Merge
-      // both so a delayed secondary listener can never make this checklist
-      // temporarily appear empty.
-      const uniqueOpenTasks = new Map<string, Todo>();
-      [...todos, ...allOpenTodos].forEach((todo) => {
-        if (todo.status === "open" && todo.projectId === selectedId)
-          uniqueOpenTasks.set(todo.id, todo);
-      });
-      return sortTodos([...uniqueOpenTasks.values()]);
-    },
-    [todos, allOpenTodos, selectedId],
+    () => sortTodos(todos.filter((todo) => todo.status === "open" && todo.projectId === (finishProjectId || selectedId))),
+    [todos, finishProjectId, selectedId],
   );
   const elapsed = startedAt
     ? accumulatedSeconds +
@@ -780,6 +770,9 @@ export default function App() {
   const openFinishModal = () => {
     setSessionTodoIds([]);
     setNotedSessionTodoIds([]);
+    // Freeze the timer's visible project for this save flow. A Firebase
+    // snapshot arriving behind the modal must not switch the checklist.
+    setFinishProjectId(selectedId);
     setShowNote(true);
   };
   const closeFinishModal = () => {
@@ -787,6 +780,7 @@ export default function App() {
     setShowNote(false);
     setSessionTodoIds([]);
     setNotedSessionTodoIds([]);
+    setFinishProjectId(null);
   };
   const finish = async () => {
     if (!note.trim()) return;
@@ -873,6 +867,7 @@ export default function App() {
       setSummary("");
       setSessionTodoIds([]);
       setNotedSessionTodoIds([]);
+      setFinishProjectId(null);
       setShowNote(false);
     } catch (error: any) {
       setSyncError(error?.message || "Could not save session.");
@@ -2099,7 +2094,7 @@ export default function App() {
             <section className="session-todo-completion" aria-label="Project tasks">
                 <div className="session-todo-heading">
                   <div>
-                    <span>OPEN TASKS FOR {selectedProject?.name || "THIS PROJECT"}</span>
+                    <span>OPEN TASKS FOR {finishProject?.name || "THIS PROJECT"}</span>
                     <p>{sessionOpenTodos.length ? "Tick completed work to update your Todo list when this session is saved." : "No open tasks are linked to this project yet."}</p>
                   </div>
                   <b>{sessionOpenTodos.length}</b>

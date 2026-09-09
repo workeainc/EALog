@@ -1,4 +1,4 @@
-const CACHE = 'ea-log-shell-v3';
+const CACHE = 'ea-log-shell-v4';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['/','/index.html','/manifest.webmanifest'])));
   self.skipWaiting();
