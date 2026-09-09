@@ -1622,7 +1622,14 @@ export default function App() {
                     )}
                     <button
                       className="stop-btn"
-                      onClick={() => openFinishModal(selectedProject?.id || selectedId)}
+                      onClick={() => {
+                        // Read the disabled timer selector itself at click
+                        // time. This is the canonical UI value even if an
+                        // older active-session callback is reconciling state
+                        // in the same React turn.
+                        const timerProjectId = (document.getElementById("working-project") as HTMLSelectElement | null)?.value;
+                        openFinishModal(timerProjectId || selectedProject?.id || selectedId);
+                      }}
                     >
                       <Square size={15} fill="currentColor" /> End session
                     </button>
