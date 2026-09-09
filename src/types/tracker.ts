@@ -9,6 +9,10 @@ export type TodoStatus = "open" | "completed";
 export type TodoPriority = "low" | "medium" | "high";
 export type NoteType = "important" | "message" | "information" | "status" | "decision";
 export type NoteState = "active" | "archived";
+export type RoutineCategory = "spiritual" | "health" | "break" | "personal";
+export type RoutineStatus = "planned" | "completed" | "skipped" | "snoozed" | "missed";
+export interface Routine { id: string; name: string; category: RoutineCategory; time: string; durationMinutes: number; repeatDays: number[]; reminderMinutes: number; sessionBehavior: "warn" | "pause"; strict: boolean; active: boolean; createdAt: Timestamp | null; updatedAt: Timestamp | null; }
+export interface RoutineLog { id: string; routineId: string; dateString: string; status: RoutineStatus; completedAt: Timestamp | null; skippedReason?: string; snoozedUntil?: string; }
 
 export interface Todo {
   id: string;

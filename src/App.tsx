@@ -21,6 +21,7 @@ import {
   Settings,
   Search,
   Square,
+  Sparkles,
   Target,
   Timer,
   Trophy,
@@ -34,6 +35,7 @@ import ProjectsView from "./components/ProjectsView";
 import TodosView from "./components/TodosView";
 import NotesView from "./components/NotesView";
 import VaultView from "./components/VaultView";
+import DisciplineView from "./components/DisciplineView";
 import { summarizeNote } from "./lib/summarize";
 import {
   aggregateReportRows,
@@ -49,6 +51,8 @@ import {
   type ProjectNote,
   type TodoPriority,
   type TrackerProfile,
+  type Routine,
+  type RoutineLog,
 } from "./types/tracker";
 import {
   localDateKey,
@@ -130,7 +134,7 @@ const DEMO_LOGS: ReportLog[] = [
 const mins = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}h ${Math.max(0, minutes) % 60 ? `${Math.max(0, minutes) % 60}m` : ""}`;
 type View =
-  "overview" | "projects" | "reports" | "sessions" | "todos" | "notes" | "vault" | "settings";
+  "overview" | "projects" | "reports" | "sessions" | "todos" | "notes" | "vault" | "discipline" | "settings";
 type SyncState = {
   online: boolean;
   pending: number;
@@ -179,6 +183,9 @@ export default function App() {
   const [notes, setNotes] = useState<ProjectNote[]>([]);
   const [notesProjectId, setNotesProjectId] = useState<string | null>(null);
   const [notesFocusId, setNotesFocusId] = useState<string | null>(null);
+  const [routines, setRoutines] = useState<Routine[]>([]);
+  const [routineLogs, setRoutineLogs] = useState<RoutineLog[]>([]);
+  const [dueRoutine, setDueRoutine] = useState<Routine | null>(null);
   const [sessionFilter, setSessionFilter] = useState<
     "last2" | "last7" | "last30" | "custom"
   >(
@@ -208,6 +215,17 @@ export default function App() {
   const [activityPeriod, setActivityPeriod] = useState<
     "daily" | "weekly" | "monthly"
   >("weekly");
+  useEffect(() => {
+    if (!uid || !routines.length) return;
+    const check = async () => {
+      const now = new Date(); const day = now.getDay(); const today = localDateKey(now); const clock = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const due = routines.find((routine) => routine.active && routine.repeatDays.includes(day) && routine.time === clock && !routineLogs.some((log) => log.routineId === routine.id && log.dateString === today));
+      if (!due) return;
+      if (due.sessionBehavior === "pause" && running && !paused && tracker) await tracker.pauseSession(uid);
+      setDueRoutine(due);
+    };
+    void check(); const interval = window.setInterval(() => void check(), 30000); return () => window.clearInterval(interval);
+  }, [uid, routines, routineLogs, running, paused, tracker]);
   const [showAddProject, setShowAddProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectTarget, setNewProjectTarget] = useState("60");
@@ -230,14 +248,17 @@ export default function App() {
     let offProjects: () => void = () => {};
     let offLogs: () => void = () => {};
     let offNotes: () => void = () => {};
+    let offRoutines: () => void = () => {};
+    let offRoutineLogs: () => void = () => {};
     const todoUnsubscribers: Array<() => void> = [];
     (async () => {
       try {
-        const [{ auth }, service, todoService, noteService, authSdk] = await Promise.all([
+        const [{ auth }, service, todoService, noteService, routineService, authSdk] = await Promise.all([
           import("./lib/firebase"),
           import("./lib/tracker-service"),
           import("./lib/todo-service"),
           import("./lib/note-service"),
+          import("./lib/routine-service"),
           import("firebase/auth"),
         ]);
         // Restore the persisted browser session before deciding whether
@@ -342,6 +363,8 @@ export default function App() {
           },
         );
         offNotes = noteService.subscribeToNotes(user.uid, setNotes);
+        offRoutines = routineService.subscribeToRoutines(user.uid, setRoutines);
+        offRoutineLogs = routineService.subscribeToRoutineLogs(user.uid, setRoutineLogs);
         const todoFrom = new Date();
         todoFrom.setDate(todoFrom.getDate() - 90);
         const todoTo = new Date();
@@ -433,6 +456,8 @@ export default function App() {
       offProjects();
       offLogs();
       offNotes();
+      offRoutines();
+      offRoutineLogs();
       todoUnsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [firebaseConfigured]);
@@ -1250,6 +1275,10 @@ export default function App() {
             <KeyRound size={18} />
             Vault
           </a>
+          <a className={view === "discipline" ? "active" : ""} onClick={() => { setView("discipline"); setMobileNav(false); }}>
+            <Sparkles size={18} />
+            Discipline
+          </a>
           <div className={`sidebar-projects ${projectNavOpen ? "open" : ""}`}>
             <button
               className={view === "projects" ? "active" : ""}
@@ -1385,6 +1414,8 @@ export default function App() {
           <NotesView notes={notes} todos={todos} projects={projects} initialProjectId={notesProjectId} initialNoteId={notesFocusId} onCreate={createNote} onUpdate={updateNote} onDelete={deleteNote} onConvert={convertNote} />
         ) : view === "vault" ? (
           uid ? <VaultView uid={uid} projects={projects} /> : null
+        ) : view === "discipline" ? (
+          uid ? <DisciplineView uid={uid} routines={routines} logs={routineLogs} /> : null
         ) : view === "reports" ? (
           <ReportsView
             projects={projects}
@@ -1687,6 +1718,7 @@ export default function App() {
           </>
         )}
       </main>
+      {dueRoutine && uid && <div className="modal-backdrop routine-due-modal"><section className="note-modal"><div className="modal-icon"><Sparkles size={20}/></div><span className="eyebrow">SCHEDULED ROUTINE</span><h3>{dueRoutine.name}</h3><p>It is {dueRoutine.time}. {dueRoutine.sessionBehavior === "pause" && running ? "Your active work session was paused." : "Take this time for your commitment."}</p><div className="routine-due-actions"><button className="outline-btn" onClick={async () => { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "snoozed", { snoozedUntil: "10 minutes" }); setDueRoutine(null); }}>Snooze 10 min</button><button className="outline-btn" onClick={async () => { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "skipped"); setDueRoutine(null); }}>Skip</button><button className="start-btn" onClick={async () => { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "completed"); setDueRoutine(null); }}>Complete routine</button></div></section></div>}
       {editingLog && (
         <div className="modal-backdrop" role="presentation">
           <form
