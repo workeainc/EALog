@@ -15,6 +15,8 @@ const addMinutes = (time: string, minutes: number) => {
 const routineAction = (routine: Routine) => routine.name.toLowerCase().includes("wake") ? "I’m awake" : routine.name.toLowerCase().includes("sleep") ? "Sleep started" : "Complete";
 const addDays = (key: string, days: number) => { const date = new Date(`${key}T12:00:00`); date.setDate(date.getDate() + days); return localDateKey(date); };
 const inPlan = (routine: Routine, date: string) => (!routine.effectiveDate || routine.effectiveDate <= date) && (!routine.endDate || routine.endDate >= date);
+const planStartDate = "2026-09-17";
+const planEndDate = addDays(planStartDate, 29);
 const monthlyPlan = (startDate: string): Omit<Routine, "id" | "createdAt" | "updatedAt">[] => {
   const endDate = addDays(startDate, 29);
   const routine = (name: string, category: RoutineCategory, priority: Routine["priority"], time: string, durationMinutes: number, behavior: Routine["sessionBehavior"], strict = false) => ({ name, category, priority, time, durationMinutes, windowMinutes: priority === "critical" ? 25 : 30, repeatDays: [0,1,2,3,4,5,6], reminderMinutes: 5, sessionBehavior: behavior, strict, active: true, effectiveDate: startDate, endDate });
@@ -35,6 +37,7 @@ const monthlyPlan = (startDate: string): Omit<Routine, "id" | "createdAt" | "upd
     routine("Sleep", "health", "critical", "23:30", 30, "pause", true),
   ];
 };
+const monthlyPlanNames = new Set(monthlyPlan(planStartDate).map((routine) => routine.name));
 
 export default function DisciplineView({ uid, routines, logs }: Props) {
   const [adding, setAdding] = useState(false);
@@ -44,12 +47,13 @@ export default function DisciplineView({ uid, routines, logs }: Props) {
   const today = localDateKey();
   const todayDay = new Date(`${today}T12:00:00`).getDay();
   const todays = useMemo(() => routines.filter((routine) => routine.active && routine.repeatDays.includes(todayDay) && inPlan(routine, today)), [routines, todayDay, today]);
-  const planExists = routines.some((routine) => routine.effectiveDate === today && routine.endDate === addDays(today, 29));
+  const seededPlan = routines.filter((routine) => Boolean(routine.effectiveDate && routine.endDate && monthlyPlanNames.has(routine.name)));
+  const planExists = seededPlan.some((routine) => routine.effectiveDate === planStartDate && routine.endDate === planEndDate);
   const record = (id: string) => logs.find((log) => log.id === `${id}-${today}`);
   const completed = todays.filter((routine) => record(routine.id)?.status === "completed").length;
   const needsAttention = todays.filter((routine) => ["missed", "snoozed", "skipped"].includes(record(routine.id)?.status || "")).length;
   return <main className="discipline-page">
-    <header><div><span className="discipline-icon"><Sparkles size={21}/></span><div><h1>Discipline</h1><p>Protect your personal commitments alongside focused work.</p></div></div><div className="discipline-header-actions">{!planExists && <button className="outline-btn" disabled={seeding} onClick={async () => { setSeeding(true); try { await Promise.all(monthlyPlan(today).map((input) => saveRoutine(uid, input))); } finally { setSeeding(false); } }}>{seeding ? "Creating plan…" : "Seed my 30-day plan"}</button>}<button className="start-btn" onClick={() => setAdding(true)}><Plus size={16}/> New routine</button></div></header>
+    <header><div><span className="discipline-icon"><Sparkles size={21}/></span><div><h1>Discipline</h1><p>Protect your personal commitments alongside focused work.</p></div></div><div className="discipline-header-actions">{!planExists && <button className="outline-btn" disabled={seeding} onClick={async () => { setSeeding(true); try { if (seededPlan.length) { await Promise.all(seededPlan.map(({ id, createdAt, updatedAt, ...routine }) => saveRoutine(uid, { ...routine, effectiveDate: planStartDate, endDate: planEndDate }, id))); } else { await Promise.all(monthlyPlan(planStartDate).map((input) => saveRoutine(uid, input))); } } finally { setSeeding(false); } }}>{seeding ? "Updating plan…" : seededPlan.length ? "Move plan to 17 Sep" : "Seed plan: 17 Sep"}</button>}<button className="start-btn" onClick={() => setAdding(true)}><Plus size={16}/> New routine</button></div></header>
     <section className="discipline-summary"><article><span>Today’s routines</span><b>{todays.length}</b></article><article><span>Completed</span><b>{completed} / {todays.length}</b></article><article><span>Needs attention</span><b>{needsAttention}</b></article></section>
     <section className="discipline-timeline"><header><div><span className="eyebrow">TODAY’S ROUTINES</span><h2>{new Date(`${today}T12:00:00`).toLocaleDateString("en-GB", { weekday:"long", day:"numeric", month:"long" })}</h2></div><span>{Math.max(0, todays.length - completed)} remaining</span></header>
       {todays.length ? todays.map((routine) => { const status = record(routine.id)?.status; const special = /sleep|wake/i.test(routine.name); return <article key={routine.id} className={status || "planned"}><time>{routine.time}<small>until {addMinutes(routine.time, routine.windowMinutes)}</small></time><i className={routine.category}/><div><b>{special && (routine.name.toLowerCase().includes("sleep") ? <Moon size={14}/> : <Sunrise size={14}/>)} {routine.name} <span className={`routine-priority ${routine.priority}`}>{priorityLabel[routine.priority]}</span></b><small>{routine.category} · {routine.durationMinutes} min · {routine.priority === "critical" ? "Auto-pause and lock" : routine.sessionBehavior === "pause" ? "Auto-pause work session" : "Reminder only"}</small></div>{status ? <em>{status}</em> : <div className="routine-actions"><button onClick={() => void logRoutine(uid, routine.id, today, "completed")}><Check size={15}/>{routineAction(routine)}</button><button onClick={() => setSkipRoutine(routine)}><SkipForward size={15}/> Skip</button></div>}<button className="routine-edit" title={`Edit ${routine.name}`} onClick={() => setEditing(routine)}><Pencil size={14}/></button></article>; }) : <p className="discipline-empty">No routines planned today. Create one to start building your schedule.</p>}
