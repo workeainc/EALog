@@ -27,6 +27,16 @@ service cloud.firestore {
         allow read, create, update, delete: if isOwner(userId);
       }
 
+      // Vault documents contain client-side ciphertext only. Ownership protects
+      // document access; the Master Password never reaches Firestore.
+      match /vault_meta/{metaId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
+
+      match /vault_items/{itemId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
+
       match /active_session/{sessionId} {
         allow read, create, delete: if isOwner(userId);
         // Only the current app's explicit Pause action may introduce pausedAt.

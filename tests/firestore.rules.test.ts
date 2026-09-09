@@ -80,4 +80,17 @@ describe("Firestore owner rules", () => {
       }),
     );
   });
+
+  it("keeps Vault metadata and encrypted items owner-only", async () => {
+    const ownerDb = testEnv.authenticatedContext(ownerId).firestore();
+    const meta = doc(ownerDb, `users/${ownerId}/vault_meta/default`);
+    const item = doc(ownerDb, `users/${ownerId}/vault_items/vault-item-1`);
+    await assertSucceeds(setDoc(meta, { schemaVersion: 1, kdf: { name: "PBKDF2" }, verifier: { ciphertext: "encrypted" } }));
+    await assertSucceeds(setDoc(item, { schemaVersion: 1, iv: "nonce", ciphertext: "encrypted" }));
+    const otherDb = testEnv.authenticatedContext(otherId).firestore();
+    await assertFails(getDoc(doc(otherDb, `users/${ownerId}/vault_meta/default`)));
+    await assertFails(getDoc(doc(otherDb, `users/${ownerId}/vault_items/vault-item-1`)));
+    const anonymousDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anonymousDb, `users/${ownerId}/vault_items/vault-item-1`)));
+  });
 });

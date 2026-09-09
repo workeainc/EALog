@@ -24,6 +24,7 @@ Baseline: commit `213435e` (2026-09-04). This plan is based on the current React
 7. `007-advanced-project-reports.md` — deliver enriched project-wise daily/weekly/monthly PDFs and honest one-click WhatsApp/email sharing.
 8. `008-projects-workspace.md` — add a dedicated Projects workspace with metadata, detail views, archive lifecycle, and project history.
 9. `009-smart-project-todos.md` — add an owner-scoped daily Todo workspace, project-linked completion statistics, offline reconciliation, and Project dashboard drill-downs.
+10. `010-encrypted-password-vault.md` — add a zero-knowledge password vault, automatic-header Excel/CSV import, and a separate Vault workspace.
 
 Do not deploy before plans 001–003 pass their verification gates. PDF sharing should open a compose flow with a generated/downloaded report; automatic attachment is only possible with an explicitly authorized backend/integration and is out of scope for this client-only MVP.
 
@@ -40,3 +41,4 @@ Do not deploy before plans 001–003 pass their verification gates. PDF sharing 
 | 007 | DONE | Project breakdown model, enriched branded PDF summary, and responsive report breakdown UI deployed. |
 | 008 | DONE | Dedicated Projects workspace, metadata editor, search/filter, lifecycle actions, ordering, and project shortcuts deployed. |
 | 009 | DONE | Todo workspace, owner-scoped Firestore data, daily/project completion analytics, offline-aware sync, and tests deployed. |
+| 010 | PARTIAL | Core encrypted Vault, local CSV/XLSX import, owner-only rules, and unit tests implemented. Emulator rules verification remains blocked by local Java 17; Firebase Emulator requires Java 21. |

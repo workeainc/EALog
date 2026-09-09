@@ -11,6 +11,7 @@ import {
   Flame,
   FolderKanban,
   LayoutDashboard,
+  KeyRound,
   ListTodo,
   StickyNote,
   Menu,
@@ -32,6 +33,7 @@ import ProfileSettings from "./components/ProfileSettings";
 import ProjectsView from "./components/ProjectsView";
 import TodosView from "./components/TodosView";
 import NotesView from "./components/NotesView";
+import VaultView from "./components/VaultView";
 import { summarizeNote } from "./lib/summarize";
 import {
   aggregateReportRows,
@@ -128,7 +130,7 @@ const DEMO_LOGS: ReportLog[] = [
 const mins = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}h ${Math.max(0, minutes) % 60 ? `${Math.max(0, minutes) % 60}m` : ""}`;
 type View =
-  "overview" | "projects" | "reports" | "sessions" | "todos" | "notes" | "settings";
+  "overview" | "projects" | "reports" | "sessions" | "todos" | "notes" | "vault" | "settings";
 type SyncState = {
   online: boolean;
   pending: number;
@@ -1243,6 +1245,10 @@ export default function App() {
             <StickyNote size={18} />
             Notes
           </a>
+          <a className={view === "vault" ? "active" : ""} onClick={() => { setView("vault"); setMobileNav(false); }}>
+            <KeyRound size={18} />
+            Vault
+          </a>
           <div className={`sidebar-projects ${projectNavOpen ? "open" : ""}`}>
             <button
               className={view === "projects" ? "active" : ""}
@@ -1314,7 +1320,7 @@ export default function App() {
         </div>
       </aside>
       <main className="main">
-        {view !== "sessions" && view !== "projects" && view !== "todos" && view !== "notes" && <header>
+        {view !== "sessions" && view !== "projects" && view !== "todos" && view !== "notes" && view !== "vault" && <header>
           <button className="menu-button" onClick={() => setMobileNav(true)}>
             <Menu />
           </button>
@@ -1375,6 +1381,8 @@ export default function App() {
           />
         ) : view === "notes" ? (
           <NotesView notes={notes} projects={projects} initialProjectId={notesProjectId} onCreate={createNote} onUpdate={updateNote} onDelete={deleteNote} onConvert={convertNote} />
+        ) : view === "vault" ? (
+          uid ? <VaultView uid={uid} projects={projects} /> : null
         ) : view === "reports" ? (
           <ReportsView
             projects={projects}
