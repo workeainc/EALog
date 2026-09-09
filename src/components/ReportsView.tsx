@@ -62,6 +62,7 @@ export default function ReportsView({
         filename: string;
     } | null>(null);
     const [shareHint, setShareHint] = useState("");
+    const [showDetails, setShowDetails] = useState(false);
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const range = useMemo(
         () =>
@@ -144,6 +145,9 @@ export default function ReportsView({
               Math.round((report.totalMinutes / report.targetMinutes) * 100),
           )
         : 0;
+    const workedDays = Object.keys(report.byDay).length;
+    const averageWorkedDay = workedDays ? Math.round(report.totalMinutes / workedDays) : 0;
+    const maxDayMinutes = Math.max(1, ...Object.values(report.byDay));
 
     const shareCopy = async () => {
         setCopied(await copyReportSummary(report));
@@ -200,6 +204,8 @@ export default function ReportsView({
                     <RefreshCw size={15} /> Refresh
                 </button>
             </div>
+            <div className="report-builder">
+                <div><span className="eyebrow">REPORT BUILDER</span><p>Choose a project and reporting period.</p></div>
             <div className="report-filters">
                 <label htmlFor="report-project">
                     Project
@@ -257,12 +263,12 @@ export default function ReportsView({
                         </label>
                     </>
                 )}
-            </div>
+            </div></div>
             {error && <p className="sync-warning">{error}</p>}
-            <div className="report-preview">
+            <div className="report-studio">
                 <div className="report-preview-head">
                     <div>
-                        <span className="eyebrow">WORKHOURS REPORT</span>
+                        <span className="eyebrow">WORK SUMMARY</span>
                         <h3>{report.projectName}</h3>
                         <p className="muted">
                             {report.from} → {report.to} · Generated{" "}
@@ -281,56 +287,6 @@ export default function ReportsView({
                             </p>
                         )}
                     </div>
-                    <div className="report-actions">
-                        <button
-                            className="outline-btn"
-                            disabled={loading}
-                            onClick={previewPdf}
-                        >
-                            <Eye size={15} /> Preview PDF
-                        </button>
-                        <button
-                            className="start-btn"
-                            disabled={loading}
-                            onClick={downloadPdf}
-                        >
-                            <Download size={15} /> Download PDF
-                        </button>
-                        <button
-                            className="outline-btn"
-                            disabled={loading}
-                            onClick={() => sharePdf("share")}
-                        >
-                            <Send size={15} /> Share PDF
-                        </button>
-                        <button
-                            className="outline-btn"
-                            disabled={loading}
-                            onClick={() => sharePdf("whatsapp")}
-                        >
-                            <MessageCircle size={15} /> WhatsApp PDF
-                        </button>
-                        <button
-                            className="outline-btn"
-                            disabled={loading}
-                            onClick={() => sharePdf("email")}
-                        >
-                            <Mail size={15} /> Email PDF
-                        </button>
-                        <button
-                            className="outline-btn"
-                            disabled={loading}
-                            onClick={shareCopy}
-                        >
-                            {copied ? (
-                                "Copied!"
-                            ) : (
-                                <>
-                                    <Copy size={15} /> Copy summary
-                                </>
-                            )}
-                        </button>
-                    </div>
                 </div>
                 {shareHint && <p className="share-hint">{shareHint}</p>}
                 {loading ? (
@@ -342,7 +298,7 @@ export default function ReportsView({
                     </div>
                 ) : (
                     <>
-                        <div className="report-kpis">
+                        <div className="report-kpis report-executive-kpis">
                             <div>
                                 <span>Total tracked</span>
                                 <strong>
@@ -355,9 +311,7 @@ export default function ReportsView({
                             </div>
                             <div>
                                 <span>Days worked</span>
-                                <strong>
-                                    {Object.keys(report.byDay).length}
-                                </strong>
+                                <strong>{workedDays} / {Math.max(1, Math.round((new Date(`${report.to}T12:00:00`).getTime() - new Date(`${report.from}T12:00:00`).getTime()) / 86400000) + 1)}</strong>
                             </div>
                             {report.targetMinutes && (
                                 <div>
@@ -369,17 +323,20 @@ export default function ReportsView({
                                 </div>
                             )}
                         </div>
-                        <div className="report-day-list">
-                            <h4>Day-by-day breakdown</h4>
+                        <section className="report-work-overview"><header><div><span className="eyebrow">WORK OVERVIEW</span><h4>Tracked time by day</h4></div><b>{formatMinutes(report.totalMinutes)} total · {formatMinutes(averageWorkedDay)} average worked day</b></header><div className="report-bars">
                             {Object.entries(report.byDay)
                                 .sort(([a], [b]) => a.localeCompare(b))
                                 .map(([day, minutes]) => (
-                                    <div key={day}>
-                                        <span>{day}</span>
-                                        <b>{formatMinutes(minutes)}</b>
+                                    <div key={day} title={`${day}: ${formatMinutes(minutes)}`}>
+                                        <i style={{ height: `${Math.max(4, (minutes / maxDayMinutes) * 100)}%` }} />
+                                        <span>{new Date(`${day}T12:00:00`).getDate()}</span>
                                     </div>
                                 ))}
-                        </div>
+                        </div></section>
+                        <section className="report-actual-expected"><div><span className="eyebrow">ACTUAL VS EXPECTED</span><h4>{formatMinutes(report.totalMinutes)} actual <small>vs {formatMinutes(report.targetMinutes || 0)} target</small></h4></div><div className="report-compare"><p><span>Actual</span><i><b style={{ width: `${pct || 0}%` }} /></i><strong>{formatMinutes(report.totalMinutes)}</strong></p><p><span>Expected</span><i><b className="expected" style={{ width: "100%" }} /></i><strong>{formatMinutes(report.targetMinutes || 0)}</strong></p></div></section>
+                        <section className="report-day-list"><header><div><span className="eyebrow">DAILY ACTIVITY</span><h4>Work timeline</h4></div></header>
+                            {Object.entries(report.byDay).sort(([a], [b]) => b.localeCompare(a)).map(([day, minutes]) => <div key={day}><span>{new Date(`${day}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span><i><b style={{ width: `${(minutes / maxDayMinutes) * 100}%` }} /></i><strong>{formatMinutes(minutes)}</strong></div>)}
+                        </section>
                         {report.projectBreakdown && (
                             <div className="report-project-breakdown">
                                 <div className="report-breakdown-heading">
@@ -425,7 +382,7 @@ export default function ReportsView({
                                 </div>
                             </div>
                         )}
-                        <div className="table-wrap">
+                        <section className="report-details"><header><div><span className="eyebrow">DETAILED ACTIVITY</span><h4>{report.sessionCount} sessions</h4></div><button className="outline-btn" onClick={() => setShowDetails(!showDetails)}>{showDetails ? "Collapse" : "Expand"}</button></header>{showDetails && <div className="table-wrap">
                             <table>
                                 <thead>
                                     <tr>
@@ -481,7 +438,8 @@ export default function ReportsView({
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
+                        </div>}</section>
+                        <section className="report-actions-panel"><header><div><span className="eyebrow">REPORT ACTIONS</span><h4>Share or export this report</h4></div><span>Ready to share</span></header><div className="report-actions"><button className="outline-btn" disabled={loading} onClick={previewPdf}><Eye size={15} /> Preview PDF</button><button className="start-btn" disabled={loading} onClick={downloadPdf}><Download size={15} /> Download PDF</button><button className="outline-btn" disabled={loading} onClick={() => sharePdf("share")}><Send size={15} /> Share PDF</button><button className="outline-btn" disabled={loading} onClick={() => sharePdf("whatsapp")}><MessageCircle size={15} /> WhatsApp PDF</button><button className="outline-btn" disabled={loading} onClick={() => sharePdf("email")}><Mail size={15} /> Email PDF</button><button className="outline-btn" disabled={loading} onClick={shareCopy}>{copied ? "Copied!" : <><Copy size={15} /> Copy summary</>}</button></div></section>
                     </>
                 )}
             </div>
