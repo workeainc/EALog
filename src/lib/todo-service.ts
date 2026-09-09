@@ -108,6 +108,12 @@ export const subscribeToOpenOverdueTodos = (
     callback,
   );
 
+/** Open tasks for session completion; no date window so a project task never disappears from End Session. */
+export const subscribeToOpenTodos = (
+  uid: string,
+  callback: (todos: Todo[]) => void,
+) => subscribe(query(todosRef(uid), where("status", "==", "open")), callback);
+
 /** Tasks actually completed in a date range. This powers real productivity metrics. */
 export const subscribeToTodosCompletedForRange = (
   uid: string,
