@@ -186,6 +186,7 @@ export default function App() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [routineLogs, setRoutineLogs] = useState<RoutineLog[]>([]);
   const [dueRoutine, setDueRoutine] = useState<Routine | null>(null);
+  const [routineWarning, setRoutineWarning] = useState<Routine | null>(null);
   const [sessionFilter, setSessionFilter] = useState<
     "last2" | "last7" | "last30" | "custom"
   >(
@@ -217,15 +218,30 @@ export default function App() {
   >("weekly");
   useEffect(() => {
     if (!uid || !routines.length) return;
+    const toMinutes = (time: string) => { const [hour, minute] = time.split(":").map(Number); return hour * 60 + minute; };
     const check = async () => {
-      const now = new Date(); const day = now.getDay(); const today = localDateKey(now); const clock = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      const due = routines.find((routine) => routine.active && routine.repeatDays.includes(day) && routine.time === clock && !routineLogs.some((log) => log.routineId === routine.id && log.dateString === today));
-      if (!due) return;
-      if (due.sessionBehavior === "pause" && running && !paused && tracker) await tracker.pauseSession(uid);
-      setDueRoutine(due);
+      const now = new Date(); const today = localDateKey(now); const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const applicable = routines.filter((routine) => routine.active && routine.repeatDays.includes(now.getDay()));
+      const logFor = (routine: Routine) => routineLogs.find((log) => log.routineId === routine.id && log.dateString === today);
+      for (const routine of applicable) {
+        const log = logFor(routine); const scheduled = toMinutes(routine.time);
+        if (log?.status === "completed" || log?.status === "skipped" || log?.status === "missed") continue;
+        const snoozedUntil = log?.status === "snoozed" && log.snoozedUntil ? Date.parse(log.snoozedUntil) : NaN;
+        const dueAt = Number.isFinite(snoozedUntil) ? new Date(snoozedUntil).getHours() * 60 + new Date(snoozedUntil).getMinutes() : scheduled;
+        if (nowMinutes > scheduled + routine.windowMinutes) {
+          const { logRoutine } = await import("./lib/routine-service");
+          await logRoutine(uid, routine.id, today, "missed");
+          continue;
+        }
+        if (nowMinutes >= dueAt && !dueRoutine) {
+          if ((routine.priority === "critical" || routine.priority === "high" || routine.sessionBehavior === "pause") && running && !paused && tracker) await tracker.pauseSession(uid);
+          setRoutineWarning(null); setDueRoutine(routine); return;
+        }
+        if (nowMinutes >= scheduled - routine.reminderMinutes && nowMinutes < scheduled && !routineWarning && !dueRoutine) setRoutineWarning(routine);
+      }
     };
     void check(); const interval = window.setInterval(() => void check(), 30000); return () => window.clearInterval(interval);
-  }, [uid, routines, routineLogs, running, paused, tracker]);
+  }, [uid, routines, routineLogs, running, paused, tracker, dueRoutine, routineWarning]);
   const [showAddProject, setShowAddProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectTarget, setNewProjectTarget] = useState("60");
@@ -1718,7 +1734,8 @@ export default function App() {
           </>
         )}
       </main>
-      {dueRoutine && uid && <div className="modal-backdrop routine-due-modal"><section className="note-modal"><div className="modal-icon"><Sparkles size={20}/></div><span className="eyebrow">SCHEDULED ROUTINE</span><h3>{dueRoutine.name}</h3><p>It is {dueRoutine.time}. {dueRoutine.sessionBehavior === "pause" && running ? "Your active work session was paused." : "Take this time for your commitment."}</p><div className="routine-due-actions"><button className="outline-btn" onClick={async () => { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "snoozed", { snoozedUntil: "10 minutes" }); setDueRoutine(null); }}>Snooze 10 min</button><button className="outline-btn" onClick={async () => { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "skipped"); setDueRoutine(null); }}>Skip</button><button className="start-btn" onClick={async () => { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "completed"); setDueRoutine(null); }}>Complete routine</button></div></section></div>}
+      {routineWarning && uid && <div className="modal-backdrop routine-due-modal"><section className="note-modal"><div className="modal-icon"><Bell size={20}/></div><span className="eyebrow">UPCOMING ROUTINE</span><h3>{routineWarning.name}</h3><p>Your {routineWarning.time} commitment starts soon. Wrap up or pause your current focus session before it is due.</p><div className="routine-due-actions"><button className="outline-btn" onClick={() => setRoutineWarning(null)}>Continue working</button><button className="start-btn" onClick={async () => { if (uid && running && !paused && tracker) await tracker.pauseSession(uid); setRoutineWarning(null); }}>Pause now</button></div></section></div>}
+      {dueRoutine && uid && <div className="modal-backdrop routine-due-modal"><section className="note-modal"><div className="modal-icon"><Sparkles size={20}/></div><span className="eyebrow">SCHEDULED ROUTINE</span><h3>{dueRoutine.name}</h3><p>It is {dueRoutine.time}. {(dueRoutine.priority === "critical" || dueRoutine.priority === "high" || dueRoutine.sessionBehavior === "pause") && running ? "Your active work session was paused." : "Take this time for your commitment."}</p><div className="routine-due-actions"><button className="outline-btn" onClick={async () => { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "snoozed", { snoozedUntil: new Date(Date.now() + 10 * 60 * 1000).toISOString() }); setDueRoutine(null); }}>Snooze 10 min</button><button className="outline-btn" onClick={async () => { if (dueRoutine.priority === "critical") { const reason = window.prompt("Why are you skipping this critical routine?"); if (!reason?.trim()) return; const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "skipped", { skippedReason: reason.trim() }); } else { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "skipped"); } setDueRoutine(null); }}>Skip</button><button className="start-btn" onClick={async () => { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "completed"); setDueRoutine(null); }}>Complete routine</button></div></section></div>}
       {editingLog && (
         <div className="modal-backdrop" role="presentation">
           <form
