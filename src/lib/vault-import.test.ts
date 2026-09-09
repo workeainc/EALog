@@ -37,4 +37,14 @@ describe("vault import", () => {
     const [sheet] = await parseVaultImportFile(file);
     expect(sheet.rows).toEqual([{ Site: "Portal" }]);
   });
+
+  it("imports cached display values from formula cells without evaluating formulas", async () => {
+    const file = new File([zipSync({
+      "xl/workbook.xml": strToU8('<workbook xmlns:r="x"><sheets><sheet name="Formula values" r:id="rId1"/></sheets></workbook>'),
+      "xl/_rels/workbook.xml.rels": strToU8('<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>'),
+      "xl/worksheets/sheet1.xml": strToU8('<worksheet><sheetData><row><c r="A1" t="inlineStr"><is><t>Renewal</t></is></c></row><row><c r="A2"><f>1+1</f><v>2</v></c></row></sheetData></worksheet>'),
+    })], "formula.xlsx");
+    const [sheet] = await parseVaultImportFile(file);
+    expect(sheet.rows).toEqual([{ Renewal: "2" }]);
+  });
 });
