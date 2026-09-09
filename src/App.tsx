@@ -556,17 +556,19 @@ export default function App() {
 
   const selectedProject = projects.find((project) => project.id === selectedId);
   const sessionOpenTodos = useMemo(
-    () =>
-      sortTodos(
-        allOpenTodos.filter(
-          (todo) =>
-            // The locked timer selector is the project the user sees and
-            // chose for this session. Use it for the completion checklist;
-            // a delayed active-session snapshot must never replace it.
-            todo.projectId === selectedId,
-        ),
-      ),
-    [allOpenTodos, selectedId],
+    () => {
+      // The dashboard stream already contains today's tasks, while the
+      // unbounded stream covers tasks outside its visible date range. Merge
+      // both so a delayed secondary listener can never make this checklist
+      // temporarily appear empty.
+      const uniqueOpenTasks = new Map<string, Todo>();
+      [...todos, ...allOpenTodos].forEach((todo) => {
+        if (todo.status === "open" && todo.projectId === selectedId)
+          uniqueOpenTasks.set(todo.id, todo);
+      });
+      return sortTodos([...uniqueOpenTasks.values()]);
+    },
+    [todos, allOpenTodos, selectedId],
   );
   const elapsed = startedAt
     ? accumulatedSeconds +

@@ -1,4 +1,4 @@
-const CACHE = 'ea-log-shell-v2';
+const CACHE = 'ea-log-shell-v3';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['/','/index.html','/manifest.webmanifest'])));
   self.skipWaiting();
@@ -12,7 +12,9 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fetch(request).catch(() => caches.match('/index.html')));
     return;
   }
-  event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+  // Hashed build assets should always prefer the network. This ensures a
+  // released UI fix reaches installed PWA users rather than an old bundle.
+  event.respondWith(fetch(request).then((response) => {
     const copy = response.clone(); caches.open(CACHE).then((cache) => cache.put(request, copy)); return response;
-  })));
+  }).catch(() => caches.match(request).then((cached) => cached || Response.error())));
 });
