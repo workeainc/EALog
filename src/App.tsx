@@ -221,7 +221,7 @@ export default function App() {
     const toMinutes = (time: string) => { const [hour, minute] = time.split(":").map(Number); return hour * 60 + minute; };
     const check = async () => {
       const now = new Date(); const today = localDateKey(now); const nowMinutes = now.getHours() * 60 + now.getMinutes();
-      const applicable = routines.filter((routine) => routine.active && routine.repeatDays.includes(now.getDay()));
+      const applicable = routines.filter((routine) => routine.active && routine.repeatDays.includes(now.getDay()) && (!routine.effectiveDate || routine.effectiveDate <= today) && (!routine.endDate || routine.endDate >= today));
       const logFor = (routine: Routine) => routineLogs.find((log) => log.routineId === routine.id && log.dateString === today);
       for (const routine of applicable) {
         const log = logFor(routine); const scheduled = toMinutes(routine.time);

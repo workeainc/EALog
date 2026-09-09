@@ -11,7 +11,7 @@ export type NoteType = "important" | "message" | "information" | "status" | "dec
 export type NoteState = "active" | "archived";
 export type RoutineCategory = "spiritual" | "health" | "break" | "personal";
 export type RoutineStatus = "planned" | "completed" | "skipped" | "snoozed" | "missed";
-export interface Routine { id: string; name: string; category: RoutineCategory; priority: "critical" | "high" | "normal"; time: string; durationMinutes: number; windowMinutes: number; repeatDays: number[]; reminderMinutes: number; sessionBehavior: "warn" | "pause"; strict: boolean; active: boolean; createdAt: Timestamp | null; updatedAt: Timestamp | null; }
+export interface Routine { id: string; name: string; category: RoutineCategory; priority: "critical" | "high" | "normal"; time: string; durationMinutes: number; windowMinutes: number; repeatDays: number[]; reminderMinutes: number; sessionBehavior: "warn" | "pause"; strict: boolean; active: boolean; /** Optional inclusive plan range; omitted routines stay evergreen. */ effectiveDate?: string; endDate?: string; createdAt: Timestamp | null; updatedAt: Timestamp | null; }
 export interface RoutineLog { id: string; routineId: string; dateString: string; status: RoutineStatus; completedAt: Timestamp | null; skippedReason?: string; snoozedUntil?: string; }
 
 export interface Todo {
