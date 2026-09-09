@@ -767,12 +767,12 @@ export default function App() {
       setSyncError(error?.message || "Could not resume session.");
     }
   };
-  const openFinishModal = () => {
+  const openFinishModal = (projectId: string) => {
     setSessionTodoIds([]);
     setNotedSessionTodoIds([]);
     // Freeze the timer's visible project for this save flow. A Firebase
     // snapshot arriving behind the modal must not switch the checklist.
-    setFinishProjectId(selectedId);
+    setFinishProjectId(projectId);
     setShowNote(true);
   };
   const closeFinishModal = () => {
@@ -1622,7 +1622,7 @@ export default function App() {
                     )}
                     <button
                       className="stop-btn"
-                      onClick={openFinishModal}
+                      onClick={() => openFinishModal(selectedProject?.id || selectedId)}
                     >
                       <Square size={15} fill="currentColor" /> End session
                     </button>
