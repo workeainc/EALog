@@ -7,7 +7,7 @@ export type ProjectStatus =
 export type ProjectPriority = "low" | "medium" | "high";
 export type TodoStatus = "open" | "completed";
 export type TodoPriority = "low" | "medium" | "high";
-export type NoteType = "important" | "message" | "information" | "status";
+export type NoteType = "important" | "message" | "information" | "status" | "decision";
 export type NoteState = "active" | "archived";
 
 export interface Todo {
@@ -23,6 +23,10 @@ export interface Todo {
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
   lastMutationId: string;
+  /** Optional provenance when a task is created from selected Note context. */
+  sourceNoteId?: string | null;
+  sourceTextHash?: string | null;
+  sourceNoteTitle?: string | null;
   /** Local-only indicator supplied by the Firestore snapshot. */
   pendingSync?: boolean;
 }

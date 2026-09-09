@@ -178,6 +178,7 @@ export default function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [notes, setNotes] = useState<ProjectNote[]>([]);
   const [notesProjectId, setNotesProjectId] = useState<string | null>(null);
+  const [notesFocusId, setNotesFocusId] = useState<string | null>(null);
   const [sessionFilter, setSessionFilter] = useState<
     "last2" | "last7" | "last30" | "custom"
   >(
@@ -1117,7 +1118,7 @@ export default function App() {
     if (!window.confirm(`Delete “${note.title}”?`)) return;
     if (uid) return (await import("./lib/note-service")).deleteNote(uid, note.id);
   };
-  const convertNote = async (note: ProjectNote, input: { title: string; priority: TodoPriority; plannedDateString: string }) => {
+  const convertNote = async (note: ProjectNote, input: { title: string; priority: TodoPriority; plannedDateString: string; sourceText: string }) => {
     if (uid) return (await import("./lib/note-service")).convertNoteToTask(uid, note, input).then(() => undefined);
   };
   const projectColor = (id: string) =>
@@ -1241,7 +1242,7 @@ export default function App() {
             <ListTodo size={18} />
             Tasks
           </a>
-          <a className={view === "notes" ? "active" : ""} onClick={() => { setNotesProjectId(null); setView("notes"); setMobileNav(false); }}>
+          <a className={view === "notes" ? "active" : ""} onClick={() => { setNotesProjectId(null); setNotesFocusId(null); setView("notes"); setMobileNav(false); }}>
             <StickyNote size={18} />
             Notes
           </a>
@@ -1366,7 +1367,7 @@ export default function App() {
               setShowAddProject(true);
             }}
             onStatus={changeProjectStatus}
-            onOpenNotes={(projectId) => { setNotesProjectId(projectId); setView("notes"); }}
+            onOpenNotes={(projectId) => { setNotesProjectId(projectId); setNotesFocusId(null); setView("notes"); }}
           />
         ) : view === "todos" ? (
           <TodosView
@@ -1378,9 +1379,10 @@ export default function App() {
             onMove={moveTodo}
             onUpdate={updateTodo}
             onDelete={removeTodo}
+            onOpenNote={(noteId) => { setNotesProjectId(null); setNotesFocusId(noteId); setView("notes"); }}
           />
         ) : view === "notes" ? (
-          <NotesView notes={notes} projects={projects} initialProjectId={notesProjectId} onCreate={createNote} onUpdate={updateNote} onDelete={deleteNote} onConvert={convertNote} />
+          <NotesView notes={notes} todos={todos} projects={projects} initialProjectId={notesProjectId} initialNoteId={notesFocusId} onCreate={createNote} onUpdate={updateNote} onDelete={deleteNote} onConvert={convertNote} />
         ) : view === "vault" ? (
           uid ? <VaultView uid={uid} projects={projects} /> : null
         ) : view === "reports" ? (

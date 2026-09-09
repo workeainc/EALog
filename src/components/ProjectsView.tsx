@@ -136,7 +136,7 @@ export default function ProjectsView({
       0,
     );
     const todayProjectTodos = todosForProjectOnDate(todos, selected.id, today);
-    const projectNotes = notes.filter((note) => note.projectId === selected.id && note.state === "active").sort((a, b) => Number(b.pinned) - Number(a.pinned));
+    const projectNotes = notes.filter((note) => note.projectId === selected.id && note.state === "active").sort((a, b) => Number(b.pinned) - Number(a.pinned) || (b.updatedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0));
     const todayTodoStats = buildTodoDayStats(todayProjectTodos, today);
     const selectedDayProjectTodos = selectedDay
       ? todosForProjectOnDate(todos, selected.id, selectedDay)
@@ -369,6 +369,7 @@ export default function ProjectsView({
           </article>
           <article className="project-dashboard-card project-notes-summary">
             <div className="project-notes-head"><div><span className="eyebrow">NOTES</span><h3>{projectNotes.filter((note) => note.pinned).length} pinned · {projectNotes.length} active</h3></div><button className="text-btn" onClick={() => onOpenNotes?.(selected.id)}>View all notes →</button></div>
+            {projectNotes[0] && <p className="project-note-latest">Latest: {projectNotes[0].title}</p>}
             {projectNotes.slice(0, 3).map((note) => <div className="project-note-line" key={note.id}><i style={{ background: selected.color }} /><span><b>{note.title}</b><small>{note.type}{note.pinned ? " · Pinned" : ""}</small></span></div>)}
             {!projectNotes.length && <p className="muted">No notes for this project yet.</p>}
             <button className="text-btn" onClick={() => onOpenNotes?.(selected.id)}>+ Add note</button>

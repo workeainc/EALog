@@ -14,7 +14,7 @@ import { db } from "./firebase";
 import { toDateString } from "./date";
 import type { NoteType, ProjectNote, TodoPriority } from "../types/tracker";
 
-const noteTypes = ["important", "message", "information", "status"] as const;
+const noteTypes = ["important", "message", "information", "status", "decision"] as const;
 const notesRef = (uid: string) => collection(db, "users", uid, "notes");
 const cleanTitle = (value: string) => {
   const result = value.trim().replace(/\s+/g, " ");
@@ -23,7 +23,7 @@ const cleanTitle = (value: string) => {
 };
 const cleanContent = (value: string) => {
   const result = value.trim();
-  if (!result || result.length > 5000) throw new Error("Note content must be between 1 and 5,000 characters.");
+  if (result.length > 5000) throw new Error("Note content must be at most 5,000 characters.");
   return result;
 };
 const asNote = (id: string, data: Record<string, unknown>, pendingSync = false): ProjectNote => ({
@@ -70,20 +70,20 @@ export const updateNote = (uid: string, noteId: string, patch: Partial<Pick<Proj
 
 export const deleteNote = (uid: string, noteId: string) => deleteDoc(doc(notesRef(uid), noteId));
 
-/** Atomic task creation and linking prevents a note being converted twice. */
-export const convertNoteToTask = async (uid: string, note: ProjectNote, input: { title: string; priority: TodoPriority; plannedDateString: string }) => {
-  const noteRef = doc(notesRef(uid), note.id);
-  const taskRef = doc(collection(db, "users", uid, "todos"));
+export const hashNoteSourceText = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value.trim().replace(/\s+/g, " "))))).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+/** Same selected note context cannot create a duplicate task; other selections remain valid. */
+export const convertNoteToTask = async (uid: string, note: ProjectNote, input: { title: string; priority: TodoPriority; plannedDateString: string; sourceText: string }) => {
+  const hash = await hashNoteSourceText(input.sourceText);
+  const taskRef = doc(collection(db, "users", uid, "todos"), `note-${note.id}-${hash}`);
   await runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(noteRef);
-    if (!snapshot.exists()) throw new Error("This note no longer exists.");
-    if (snapshot.data().convertedTaskId) throw new Error("This note is already linked to a task.");
+    const snapshot = await transaction.get(taskRef);
+    if (snapshot.exists()) throw new Error("A task already exists for this selected note text.");
     transaction.set(taskRef, {
       title: cleanTitle(input.title), projectId: note.projectId, plannedDateString: toDateString(new Date(`${input.plannedDateString}T12:00:00`)),
       status: "open", priority: input.priority, sortOrder: Date.now(), completedAt: null, completedDateString: null,
+      sourceNoteId: note.id, sourceTextHash: hash, sourceNoteTitle: note.title,
       createdAt: serverTimestamp(), updatedAt: serverTimestamp(), lastMutationId: crypto.randomUUID(),
     });
-    transaction.update(noteRef, { convertedTaskId: taskRef.id, updatedAt: serverTimestamp() });
   });
   return taskRef.id;
 };

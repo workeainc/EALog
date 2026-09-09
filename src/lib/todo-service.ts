@@ -51,6 +51,9 @@ const asTodo = (
   updatedAt: data.updatedAt || null,
   lastMutationId:
     typeof data.lastMutationId === "string" ? data.lastMutationId : "",
+  sourceNoteId: typeof data.sourceNoteId === "string" ? data.sourceNoteId : null,
+  sourceTextHash: typeof data.sourceTextHash === "string" ? data.sourceTextHash : null,
+  sourceNoteTitle: typeof data.sourceNoteTitle === "string" ? data.sourceNoteTitle : null,
   pendingSync,
 });
 
