@@ -184,6 +184,10 @@ export default function ProjectsView({
       100,
       monthTargetMinutes ? (expectedMinutes / monthTargetMinutes) * 100 : 0,
     );
+    const deadlineDays = selected.deadlineDate ? Math.ceil((new Date(`${selected.deadlineDate}T12:00:00`).getTime() - new Date(`${today}T12:00:00`).getTime()) / 86400000) : null;
+    const healthState = status === "on_hold" ? "On hold" : status === "completed" ? "Completed" : paceDifference >= 0 ? "On track" : paceDifference > -selected.targetMinutes * 2 ? "At risk" : "Behind";
+    const healthCopy = status === "on_hold" ? "This project is paused; target days are excluded while on hold." : status === "completed" ? "This project is marked complete." : paceDifference >= 0 ? `You're ${formatMinutes(Math.abs(paceDifference))} ahead of this month's expected pace.` : `${formatMinutes(Math.abs(paceDifference))} behind pace. Add time on future target days to catch up.`;
+    const upcomingProjectTodos = todos.filter((todo) => todo.projectId === selected.id && todo.status === "open" && todo.plannedDateString > today).sort((a, b) => a.plannedDateString.localeCompare(b.plannedDateString)).slice(0, 2);
     return (
       <section className="project-dashboard">
         <button
@@ -192,49 +196,22 @@ export default function ProjectsView({
         >
           <ArrowLeft size={15} /> All projects
         </button>
-        <div className="project-dashboard-hero">
+        <div className="project-command-hero">
           <div>
-            <span className="eyebrow">PROJECT DASHBOARD</span>
             <div className="project-dashboard-title">
               <i style={{ background: selected.color }} />
               <h2>{selected.name}</h2>
               <span className={`status-pill ${status}`}>{labels[status]}</span>
             </div>
-            <p className="muted">
-              {selected.clientName || "Personal project"}
-              {selected.description ? ` · ${selected.description}` : ""}
-            </p>
-            <small className="project-todo-month">
-              This month: {monthCompletedTodos}/{monthTodos.length} completed
-            </small>
+            <p className="project-command-description">{selected.description || selected.clientName || "Personal project"}</p>
+            <small>{selected.clientName || "Personal project"} · Started {selected.startDate ? readableDate(selected.startDate) : "not set"}</small>
+            <div className="project-hero-metrics"><span><small>Today</small><b>{formatMinutes(todayMinutes)}</b></span><span><small>This month</small><b>{formatMinutes(monthlyMinutes)}</b></span><span><small>Deadline</small><b>{deadlineDays === null ? "No deadline" : deadlineDays < 0 ? "Overdue" : `${deadlineDays} days`}</b></span></div>
           </div>
           <button className="outline-btn" onClick={() => onEdit(selected)}>
             <Pencil size={14} /> Edit project
           </button>
         </div>
-        <div className="project-dashboard-stats">
-          <div>
-            <span>Today</span>
-            <b>{formatMinutes(todayMinutes)}</b>
-            <small>of {formatMinutes(selected.targetMinutes)} target</small>
-          </div>
-          <div>
-            <span>Total tracked</span>
-            <b>{formatMinutes(total(selected.id))}</b>
-            <small>{projectSessions.length} completed sessions</small>
-          </div>
-          <div>
-            <span>Priority</span>
-            <b className={`priority ${selected.priority || "medium"}`}>
-              {selected.priority || "medium"}
-            </b>
-            <small>
-              {selected.deadlineDate
-                ? `Due ${selected.deadlineDate}`
-                : "No deadline"}
-            </small>
-          </div>
-        </div>
+        <section className="project-health-section">
         <article className="project-month-progress">
           <div className="project-month-progress-head">
             <div>
@@ -284,6 +261,9 @@ export default function ProjectsView({
             </b>
           </div>
         </article>
+        <aside className={`project-health-card ${healthState.toLowerCase().replace(" ", "-")}`}><span className="eyebrow">PROJECT HEALTH</span><h3>{healthState}</h3><b className={paceDifference >= 0 ? "ahead" : "behind"}>{paceDifference >= 0 ? "+" : "−"}{formatMinutes(Math.abs(paceDifference))} {paceDifference >= 0 ? "ahead" : "behind"}</b><p>{healthCopy}</p><dl><div><dt>Daily target</dt><dd>{formatMinutes(selected.targetMinutes)}</dd></div><div><dt>Expected today</dt><dd>{formatMinutes(expectedMinutes)}</dd></div><div><dt>Sessions</dt><dd>{projectSessions.length}</dd></div></dl></aside>
+        </section>
+        <section className="project-today-zone"><article className="project-today-time"><span className="eyebrow">TODAY · TIME</span><h3>{formatMinutes(todayMinutes)} <small>of {formatMinutes(selected.targetMinutes)}</small></h3><div><i style={{ width: `${selected.targetMinutes ? Math.min(100, todayMinutes / selected.targetMinutes * 100) : 0}%`, background: selected.color }} /></div><p>{todayMinutes >= selected.targetMinutes ? "Daily target reached" : `${formatMinutes(Math.max(0, selected.targetMinutes - todayMinutes))} remaining today`}</p></article><article className="project-today-tasks"><div><span className="eyebrow">TODAY · TASKS</span><h3>{todayTodoStats.completedFromPlan}/{todayTodoStats.planned} completed</h3></div>{todayProjectTodos.slice(0, 4).map((todo) => <p key={todo.id} className={todo.status === "completed" ? "done" : ""}><i />{todo.title}</p>)}<button className="text-btn" onClick={() => onSelectProject(selected.id)}>View project tasks →</button></article></section>
         <div className="project-dashboard-grid">
           <article className="project-dashboard-card">
             <h3>Project details</h3>
@@ -366,6 +346,7 @@ export default function ProjectsView({
                 <span>{todo.title}</span>
               </div>
             ))}
+            {upcomingProjectTodos.length > 0 && <div className="project-upcoming"><span>Upcoming</span>{upcomingProjectTodos.map((todo) => <p key={todo.id}>{readableDate(todo.plannedDateString)} · {todo.title}</p>)}</div>}
           </article>
           <article className="project-dashboard-card project-notes-summary">
             <div className="project-notes-head"><div><span className="eyebrow">NOTES</span><h3>{projectNotes.filter((note) => note.pinned).length} pinned · {projectNotes.length} active</h3></div><button className="text-btn" onClick={() => onOpenNotes?.(selected.id)}>View all notes →</button></div>
