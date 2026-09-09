@@ -27,4 +27,14 @@ describe("vault import", () => {
     expect(sheet.category).toBe("Accounts");
     expect(sheet.rows).toEqual([{ Site: "Example", Password: "secret" }]);
   });
+
+  it("supports Office workbooks that use an absolute worksheet relationship", async () => {
+    const file = new File([zipSync({
+      "xl/workbook.xml": strToU8('<workbook xmlns:r="x"><sheets><sheet name="Absolute" r:id="rId1"/></sheets></workbook>'),
+      "xl/_rels/workbook.xml.rels": strToU8('<Relationships><Relationship Id="rId1" Target="/xl/worksheets/sheet1.xml"/></Relationships>'),
+      "xl/worksheets/sheet1.xml": strToU8('<worksheet><sheetData><row><c r="A1" t="inlineStr"><is><t>Site</t></is></c></row><row><c r="A2" t="inlineStr"><is><t>Portal</t></is></c></row></sheetData></worksheet>'),
+    })], "absolute.xlsx");
+    const [sheet] = await parseVaultImportFile(file);
+    expect(sheet.rows).toEqual([{ Site: "Portal" }]);
+  });
 });
