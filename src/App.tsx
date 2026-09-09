@@ -166,7 +166,6 @@ export default function App() {
   const [summary, setSummary] = useState("");
   const [sessionTodoIds, setSessionTodoIds] = useState<string[]>([]);
   const [notedSessionTodoIds, setNotedSessionTodoIds] = useState<string[]>([]);
-  const [sessionProjectId, setSessionProjectId] = useState<string | null>(null);
   const [allOpenTodos, setAllOpenTodos] = useState<Todo[]>([]);
   const [finishingSession, setFinishingSession] = useState(false);
   const [todayLogs, setTodayLogs] = useState<ReportLog[]>(
@@ -456,14 +455,12 @@ export default function App() {
             );
             if (active) {
               setSelectedId(active.projectId);
-              setSessionProjectId(active.projectId);
               // Never infer a power-cut/background gap from the
               // session start timestamp. That timestamp naturally
               // becomes older than five minutes during normal work
               // and would incorrectly pause every long session.
               setRecoveryGap(false);
             } else {
-              setSessionProjectId(null);
               setRecoveryGap(false);
             }
           },
@@ -558,16 +555,18 @@ export default function App() {
   }, []);
 
   const selectedProject = projects.find((project) => project.id === selectedId);
-  const sessionProject = projects.find((project) => project.id === (sessionProjectId || selectedId));
   const sessionOpenTodos = useMemo(
     () =>
       sortTodos(
         allOpenTodos.filter(
           (todo) =>
-            todo.projectId === (sessionProjectId || selectedId),
+            // The locked timer selector is the project the user sees and
+            // chose for this session. Use it for the completion checklist;
+            // a delayed active-session snapshot must never replace it.
+            todo.projectId === selectedId,
         ),
       ),
-    [allOpenTodos, sessionProjectId, selectedId],
+    [allOpenTodos, selectedId],
   );
   const elapsed = startedAt
     ? accumulatedSeconds +
@@ -738,7 +737,6 @@ export default function App() {
       targetAlertedRef.current = false;
       if (uid && tracker) {
         await tracker.startSession(uid, selectedProject.id);
-        setSessionProjectId(selectedProject.id);
       }
       else {
         setStartedAt(Date.now());
@@ -748,7 +746,6 @@ export default function App() {
         targetAlertedRef.current = false;
         setNow(Date.now());
         setRunning(true);
-        setSessionProjectId(selectedProject.id);
       }
     } catch (error: any) {
       setSyncError(error?.message || "Could not start session.");
@@ -833,7 +830,6 @@ export default function App() {
         targetAlertedRef.current = false;
         setStartedAt(null);
         setAccumulatedSeconds(0);
-        setSessionProjectId(null);
       } else {
         const start = new Date(startedAt || Date.now());
         const end = new Date();
@@ -855,7 +851,6 @@ export default function App() {
         targetAlertedRef.current = false;
         setStartedAt(null);
         setAccumulatedSeconds(0);
-        setSessionProjectId(null);
       }
       if (tasksToComplete.length) {
         const completionResults = await Promise.allSettled(
@@ -2102,7 +2097,7 @@ export default function App() {
             <section className="session-todo-completion" aria-label="Project tasks">
                 <div className="session-todo-heading">
                   <div>
-                    <span>OPEN TASKS FOR {sessionProject?.name || "THIS PROJECT"}</span>
+                    <span>OPEN TASKS FOR {selectedProject?.name || "THIS PROJECT"}</span>
                     <p>{sessionOpenTodos.length ? "Tick completed work to update your Todo list when this session is saved." : "No open tasks are linked to this project yet."}</p>
                   </div>
                   <b>{sessionOpenTodos.length}</b>
