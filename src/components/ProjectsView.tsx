@@ -207,9 +207,7 @@ export default function ProjectsView({
             <small>{selected.clientName || "Personal project"} · Started {selected.startDate ? readableDate(selected.startDate) : "not set"}</small>
             <div className="project-hero-metrics"><span><small>Today</small><b>{formatMinutes(todayMinutes)}</b></span><span><small>This month</small><b>{formatMinutes(monthlyMinutes)}</b></span><span><small>Deadline</small><b>{deadlineDays === null ? "No deadline" : deadlineDays < 0 ? "Overdue" : `${deadlineDays} days`}</b></span></div>
           </div>
-          <button className="outline-btn" onClick={() => onEdit(selected)}>
-            <Pencil size={14} /> Edit project
-          </button>
+          <div className="project-hero-actions"><button className="outline-btn" onClick={() => onEdit(selected)}><Pencil size={14} /> Edit project</button>{status === "archived" ? <button className="text-btn" onClick={() => void onStatus(selected, "active")}><RotateCcw size={14} /> Restore</button> : <><button className="text-btn" onClick={() => void onStatus(selected, status === "on_hold" ? "active" : "on_hold")}><PauseCircle size={14} /> {status === "on_hold" ? "Resume" : "On hold"}</button><button className="text-btn danger-text" onClick={() => void onStatus(selected, "archived")}><Archive size={14} /> Archive</button></>}</div>
         </div>
         <section className="project-health-section">
         <article className="project-month-progress">
@@ -263,70 +261,7 @@ export default function ProjectsView({
         </article>
         <aside className={`project-health-card ${healthState.toLowerCase().replace(" ", "-")}`}><span className="eyebrow">PROJECT HEALTH</span><h3>{healthState}</h3><b className={paceDifference >= 0 ? "ahead" : "behind"}>{paceDifference >= 0 ? "+" : "−"}{formatMinutes(Math.abs(paceDifference))} {paceDifference >= 0 ? "ahead" : "behind"}</b><p>{healthCopy}</p><dl><div><dt>Daily target</dt><dd>{formatMinutes(selected.targetMinutes)}</dd></div><div><dt>Expected today</dt><dd>{formatMinutes(expectedMinutes)}</dd></div><div><dt>Sessions</dt><dd>{projectSessions.length}</dd></div></dl></aside>
         </section>
-        <section className="project-today-zone"><article className="project-today-time"><span className="eyebrow">TODAY · TIME</span><h3>{formatMinutes(todayMinutes)} <small>of {formatMinutes(selected.targetMinutes)}</small></h3><div><i style={{ width: `${selected.targetMinutes ? Math.min(100, todayMinutes / selected.targetMinutes * 100) : 0}%`, background: selected.color }} /></div><p>{todayMinutes >= selected.targetMinutes ? "Daily target reached" : `${formatMinutes(Math.max(0, selected.targetMinutes - todayMinutes))} remaining today`}</p></article><article className="project-today-tasks"><div><span className="eyebrow">TODAY · TASKS</span><h3>{todayTodoStats.completedFromPlan}/{todayTodoStats.planned} completed</h3></div>{todayProjectTodos.slice(0, 4).map((todo) => <p key={todo.id} className={todo.status === "completed" ? "done" : ""}><i />{todo.title}</p>)}<button className="text-btn" onClick={() => onSelectProject(selected.id)}>View project tasks →</button></article></section>
         <div className="project-dashboard-grid">
-          <article className="project-dashboard-card">
-            <h3>Project details</h3>
-            <dl>
-              <div>
-                <dt>Status</dt>
-                <dd>{labels[status]}</dd>
-              </div>
-              <div>
-                <dt>Started</dt>
-                <dd>{selected.startDate || "Not set"}</dd>
-              </div>
-              <div>
-                <dt>Deadline</dt>
-                <dd>{selected.deadlineDate || "Not set"}</dd>
-              </div>
-              {selected.referenceUrl && (
-                <div>
-                  <dt>Reference</dt>
-                  <dd>
-                    <a
-                      href={selected.referenceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open link <ExternalLink size={13} />
-                    </a>
-                  </dd>
-                </div>
-              )}
-            </dl>
-            <div className="project-lifecycle">
-              {status === "archived" ? (
-                <button
-                  className="text-btn"
-                  onClick={() => void onStatus(selected, "active")}
-                >
-                  <RotateCcw size={14} /> Restore
-                </button>
-              ) : (
-                <>
-                  <button
-                    className="text-btn"
-                    onClick={() =>
-                      void onStatus(
-                        selected,
-                        status === "on_hold" ? "active" : "on_hold",
-                      )
-                    }
-                  >
-                    <PauseCircle size={14} />{" "}
-                    {status === "on_hold" ? "Resume" : "On hold"}
-                  </button>
-                  <button
-                    className="text-btn danger-text"
-                    onClick={() => void onStatus(selected, "archived")}
-                  >
-                    <Archive size={14} /> Archive
-                  </button>
-                </>
-              )}
-            </div>
-          </article>
           <article className="project-dashboard-card project-todo-summary">
             <span className="eyebrow">TODAY’S TASKS</span>
             <h3>
