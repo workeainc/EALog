@@ -861,6 +861,31 @@ td {
   }
 }
 @media (max-width: 580px) {
+  .main > header {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 25px;
+  }
+  .main > header > div:not(.header-actions) {
+    order: 3;
+    width: 100%;
+  }
+  .main > header .menu-button {
+    order: 1;
+    margin: 0;
+  }
+  .main > header .header-actions {
+    order: 2;
+    gap: 8px;
+  }
+  .main > header .profile-name,
+  .main > header .profile svg {
+    display: none;
+  }
+  .main > header .profile { gap: 0; }
+  .main > header .app-mode-pill { padding: 7px 10px; }
+  .main > header .sync-status-icon { width: 27px; height: 27px; }
   .main {
     padding: 22px 15px;
   }
