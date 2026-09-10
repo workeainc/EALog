@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
+  ArrowLeft,
   BarChart3,
   Bell,
   CalendarDays,
@@ -135,6 +136,17 @@ const mins = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}h ${Math.max(0, minutes) % 60 ? `${Math.max(0, minutes) % 60}m` : ""}`;
 type View =
   "overview" | "projects" | "reports" | "sessions" | "todos" | "notes" | "vault" | "discipline" | "settings";
+
+const NAVIGATION_VIEWS: View[] = [
+  "overview", "projects", "reports", "sessions", "todos", "notes", "vault", "discipline", "settings",
+];
+
+function viewFromLocation(): View {
+  if (typeof window === "undefined") return "overview";
+  const value = window.location.hash.replace(/^#/, "") as View;
+  return NAVIGATION_VIEWS.includes(value) ? value : "overview";
+}
+
 type SyncState = {
   online: boolean;
   pending: number;
@@ -208,7 +220,7 @@ export default function App() {
   const [dataLoading, setDataLoading] = useState(firebaseConfigured);
   const [needsAuth, setNeedsAuth] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
-  const [view, setView] = useState<View>("overview");
+  const [view, setView] = useState<View>(viewFromLocation);
   const [projectNavOpen, setProjectNavOpen] = useState(true);
   const [projectDashboardId, setProjectDashboardId] = useState<string | null>(
     null,
@@ -217,6 +229,34 @@ export default function App() {
   const [activityPeriod, setActivityPeriod] = useState<
     "daily" | "weekly" | "monthly"
   >("weekly");
+
+  // Keep every primary workspace page addressable in the installed app too.
+  // This gives the device back gesture/browser Back a real page history rather
+  // than leaving users stranded on a detail page.
+  useEffect(() => {
+    const restoreLocationView = () => {
+      setView(viewFromLocation());
+      setMobileNav(false);
+    };
+
+    window.addEventListener("popstate", restoreLocationView);
+    window.addEventListener("hashchange", restoreLocationView);
+    return () => {
+      window.removeEventListener("popstate", restoreLocationView);
+      window.removeEventListener("hashchange", restoreLocationView);
+    };
+  }, []);
+
+  useEffect(() => {
+    const hash = view === "overview" ? "" : `#${view}`;
+    if (window.location.hash === hash) return;
+    window.history.pushState(
+      { eaLogView: view },
+      "",
+      `${window.location.pathname}${window.location.search}${hash}`,
+    );
+  }, [view]);
+
   useEffect(() => {
     if (!uid || !routines.length) return;
     const toMinutes = (time: string) => { const [hour, minute] = time.split(":").map(Number); return hour * 60 + minute; };
@@ -1240,6 +1280,14 @@ export default function App() {
           <span>Loading your workspace…</span>
         </div>
       )}
+      {mobileNav && (
+        <button
+          type="button"
+          className="mobile-nav-backdrop"
+          aria-label="Close navigation"
+          onClick={() => setMobileNav(false)}
+        />
+      )}
       <aside className={mobileNav ? "sidebar open" : "sidebar"}>
         <div className="brand">
           <div className="brand-mark">
@@ -1374,6 +1422,18 @@ export default function App() {
         </div>
       </aside>
       <main className="main">
+        {view !== "overview" && (
+          <div className="mobile-page-navigation" aria-label="Page navigation">
+            <button type="button" onClick={() => setMobileNav(true)}>
+              <Menu size={18} />
+              Menu
+            </button>
+            <button type="button" onClick={() => setView("overview")}>
+              <ArrowLeft size={18} />
+              Overview
+            </button>
+          </div>
+        )}
         {view !== "sessions" && view !== "projects" && view !== "todos" && view !== "notes" && view !== "vault" && <header>
           <button className="menu-button" onClick={() => setMobileNav(true)}>
             <Menu />
