@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bell,
   CalendarDays,
+  Cloud,
   ChevronDown,
   CircleHelp,
   Clock3,
@@ -1309,6 +1310,12 @@ export default function App() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const syncNeedsAttention = Boolean(
+    firebaseConfigured && uid && syncState && (
+      !syncState.online || syncState.syncing || syncState.conflicts ||
+      syncState.failed || syncState.pending || syncState.fromCache
+    ),
+  );
 
   return (
     <div className="app-shell">
@@ -1480,7 +1487,7 @@ export default function App() {
             </button>
           </div>
         )}
-        <div className="app-mode-global">
+        {["sessions", "projects", "todos", "notes", "vault"].includes(view) && <div className="app-mode-global">
           <AppModeControl
             mode={activeAppMode}
             state={appMode}
@@ -1489,7 +1496,7 @@ export default function App() {
             onPlanVacation={planVacation}
             onEndVacation={resumeWorkMode}
           />
-        </div>
+        </div>}
         {view !== "sessions" && view !== "projects" && view !== "todos" && view !== "notes" && view !== "vault" && <header>
           <button className="menu-button" onClick={() => setMobileNav(true)}>
             <Menu />
@@ -1508,6 +1515,19 @@ export default function App() {
             </h1>
           </div>
           <div className="header-actions">
+            <AppModeControl
+              mode={activeAppMode}
+              state={appMode}
+              onStartBreak={startBreak}
+              onResumeWork={resumeWorkMode}
+              onPlanVacation={planVacation}
+              onEndVacation={resumeWorkMode}
+            />
+            {firebaseConfigured && uid && syncState && !syncNeedsAttention && (
+              <span className="sync-status-icon" title="Workspace synced" aria-label="Workspace synced">
+                <Cloud size={17} />
+              </span>
+            )}
             <button className="icon-btn">
               <Bell size={19} />
               <i />
@@ -1611,9 +1631,6 @@ export default function App() {
                 <h2>Today at a glance</h2>
                 <p className="muted">
                   Welcome back, {firstName}. Keep your momentum going.
-                  {firebaseConfigured && !syncError
-                    ? " Synced securely to Firebase."
-                    : ""}
                 </p>
               </div>
               <button
@@ -1642,7 +1659,7 @@ export default function App() {
                 )}
               </div>
             )}
-            {firebaseConfigured && uid && syncState && (
+            {firebaseConfigured && uid && syncState && syncNeedsAttention && (
               <div className="sync-warning" role="status">
                 {!syncState.online
                   ? "Offline — changes are saved locally and will sync when you reconnect."
