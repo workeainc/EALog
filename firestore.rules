@@ -65,6 +65,9 @@ service cloud.firestore {
       match /finance_transactions/{transactionId} {
         allow read, create, update, delete: if isOwner(userId);
       }
+      match /finance_assets/{assetId} { allow read, create, update, delete: if isOwner(userId); }
+      match /finance_goals/{goalId} { allow read, create, update, delete: if isOwner(userId); }
+      match /finance_recurring/{itemId} { allow read, create, update, delete: if isOwner(userId); }
     }
   }
 }

@@ -23,7 +23,7 @@ import {
 } from "../lib/reports";
 import { getMonthPlan, localDateKey } from "../lib/project-schedule";
 import { buildTodoDayStats, todosForProjectOnDate } from "../lib/todos";
-import type { Project, ProjectNote, ProjectStatus, Todo } from "../types/tracker";
+import type { FinanceTransaction, Project, ProjectNote, ProjectStatus, Todo } from "../types/tracker";
 
 type Props = {
   projects: Project[];
@@ -36,6 +36,7 @@ type Props = {
   onCreate: () => void;
   onStatus: (project: Project, status: ProjectStatus) => Promise<void>;
   onOpenNotes?: (projectId: string) => void;
+  financeTransactions?: FinanceTransaction[];
 };
 const labels: Record<ProjectStatus, string> = {
   planned: "Planned",
@@ -65,6 +66,7 @@ export default function ProjectsView({
   onCreate,
   onStatus,
   onOpenNotes,
+  financeTransactions = [],
 }: Props) {
   const [filter, setFilter] = useState<ProjectStatus | "all">("active");
   const [search, setSearch] = useState("");
@@ -188,6 +190,10 @@ export default function ProjectsView({
     const healthState = status === "on_hold" ? "On hold" : status === "completed" ? "Completed" : paceDifference >= 0 ? "On track" : paceDifference > -selected.targetMinutes * 2 ? "At risk" : "Behind";
     const healthCopy = status === "on_hold" ? "This project is paused; target days are excluded while on hold." : status === "completed" ? "This project is marked complete." : paceDifference >= 0 ? `You're ${formatMinutes(Math.abs(paceDifference))} ahead of this month's expected pace.` : `${formatMinutes(Math.abs(paceDifference))} behind pace. Add time on future target days to catch up.`;
     const upcomingProjectTodos = todos.filter((todo) => todo.projectId === selected.id && todo.status === "open" && todo.plannedDateString > today).sort((a, b) => a.plannedDateString.localeCompare(b.plannedDateString)).slice(0, 2);
+    const financials = financeTransactions.filter((transaction) => transaction.projectId === selected.id);
+    const revenue = financials.filter((transaction) => transaction.type === "income").reduce((sum, transaction) => sum + transaction.amount, 0);
+    const costs = financials.filter((transaction) => transaction.type === "expense").reduce((sum, transaction) => sum + transaction.amount, 0);
+    const profit = revenue - costs;
     return (
       <section className="project-dashboard">
         <button
@@ -261,6 +267,7 @@ export default function ProjectsView({
         </article>
         <aside className={`project-health-card ${healthState.toLowerCase().replace(" ", "-")}`}><span className="eyebrow">PROJECT HEALTH</span><h3>{healthState}</h3><b className={paceDifference >= 0 ? "ahead" : "behind"}>{paceDifference >= 0 ? "+" : "−"}{formatMinutes(Math.abs(paceDifference))} {paceDifference >= 0 ? "ahead" : "behind"}</b><p>{healthCopy}</p><dl><div><dt>Daily target</dt><dd>{formatMinutes(selected.targetMinutes)}</dd></div><div><dt>Expected today</dt><dd>{formatMinutes(expectedMinutes)}</dd></div><div><dt>Sessions</dt><dd>{projectSessions.length}</dd></div></dl></aside>
         </section>
+        <section className="project-financial-card"><div><span className="eyebrow">FINANCIAL PERFORMANCE</span><h3>Project economics</h3></div><div><span><small>Revenue</small><b>৳{revenue.toLocaleString()}</b></span><span><small>Expenses</small><b>৳{costs.toLocaleString()}</b></span><span><small>Profit</small><b className={profit >= 0 ? "ahead" : "behind"}>৳{profit.toLocaleString()}</b></span><span><small>Margin</small><b>{revenue ? `${Math.round(profit / revenue * 100)}%` : "—"}</b></span></div></section>
         <div className="project-dashboard-grid">
           <article className="project-dashboard-card project-todo-summary">
             <span className="eyebrow">TODAY’S TASKS</span>

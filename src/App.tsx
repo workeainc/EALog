@@ -63,6 +63,9 @@ import {
   type AppModeState,
   type FinanceAccount,
   type FinanceTransaction,
+  type FinanceAsset,
+  type FinanceGoal,
+  type RecurringFinanceItem,
 } from "./types/tracker";
 import {
   localDateKey,
@@ -212,6 +215,9 @@ export default function App() {
   const [appMode, setAppMode] = useState<AppModeState>(WORKDAY_MODE);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [financeTransactions, setFinanceTransactions] = useState<FinanceTransaction[]>([]);
+  const [financeAssets, setFinanceAssets] = useState<FinanceAsset[]>([]);
+  const [financeGoals, setFinanceGoals] = useState<FinanceGoal[]>([]);
+  const [recurringFinanceItems, setRecurringFinanceItems] = useState<RecurringFinanceItem[]>([]);
   const activeAppMode = effectiveAppMode(appMode, localDateKey(new Date(now)), now);
   const vacationActive = activeAppMode === "vacation";
   const [sessionFilter, setSessionFilter] = useState<
@@ -325,6 +331,9 @@ export default function App() {
     let offAppMode: () => void = () => {};
     let offFinanceAccounts: () => void = () => {};
     let offFinanceTransactions: () => void = () => {};
+    let offFinanceAssets: () => void = () => {};
+    let offFinanceGoals: () => void = () => {};
+    let offRecurringFinance: () => void = () => {};
     const todoUnsubscribers: Array<() => void> = [];
     (async () => {
       try {
@@ -444,6 +453,9 @@ export default function App() {
         offAppMode = subscribeToAppMode(user.uid, setAppMode);
         offFinanceAccounts = financeService.subscribeToFinanceAccounts(user.uid, setFinanceAccounts);
         offFinanceTransactions = financeService.subscribeToFinanceTransactions(user.uid, setFinanceTransactions);
+        offFinanceAssets = financeService.subscribeToFinanceAssets(user.uid, setFinanceAssets);
+        offFinanceGoals = financeService.subscribeToFinanceGoals(user.uid, setFinanceGoals);
+        offRecurringFinance = financeService.subscribeToRecurringFinanceItems(user.uid, setRecurringFinanceItems);
         const todoFrom = new Date();
         todoFrom.setDate(todoFrom.getDate() - 90);
         const todoTo = new Date();
@@ -545,6 +557,9 @@ export default function App() {
       offAppMode();
       offFinanceAccounts();
       offFinanceTransactions();
+      offFinanceAssets();
+      offFinanceGoals();
+      offRecurringFinance();
       todoUnsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [firebaseConfigured]);
@@ -1570,6 +1585,7 @@ export default function App() {
             logs={monthLogs}
             todos={todos}
             notes={notes}
+            financeTransactions={financeTransactions}
             selectedProjectId={projectDashboardId}
             onSelectProject={setProjectDashboardId}
             onEdit={(project) => {
@@ -1602,7 +1618,7 @@ export default function App() {
         ) : view === "discipline" ? (
           uid ? <DisciplineView uid={uid} routines={routines} logs={routineLogs} /> : null
         ) : view === "finance" ? (
-          uid ? <FinanceView accounts={financeAccounts} transactions={financeTransactions} projects={projects} onAccount={async input => { const service = await import("./lib/finance-service"); await service.createFinanceAccount(uid, input); }} onTransaction={async input => { const service = await import("./lib/finance-service"); await service.createFinanceTransaction(uid, input); }} /> : null
+          uid ? <FinanceView accounts={financeAccounts} transactions={financeTransactions} assets={financeAssets} goals={financeGoals} recurring={recurringFinanceItems} projects={projects} onAccount={async input => { const service = await import("./lib/finance-service"); await service.createFinanceAccount(uid, input); }} onArchiveAccount={async id => { const service = await import("./lib/finance-service"); await service.archiveFinanceAccount(uid, id); }} onTransaction={async input => { const service = await import("./lib/finance-service"); await service.createFinanceTransaction(uid, input); }} onReverse={async item => { const service = await import("./lib/finance-service"); await service.reverseFinanceTransaction(uid, item); }} onAsset={async input => { const service = await import("./lib/finance-service"); await service.createFinanceAsset(uid, input); }} onGoal={async input => { const service = await import("./lib/finance-service"); await service.createFinanceGoal(uid, input); }} onRecurring={async input => { const service = await import("./lib/finance-service"); await service.createRecurringFinanceItem(uid, input); }} /> : null
         ) : view === "reports" ? (
           <ReportsView
             projects={projects}
