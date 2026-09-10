@@ -1,16 +1,18 @@
 import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, type Unsubscribe } from "firebase/firestore";
 import { db } from "./firebase";
-import type { FinanceAccount, FinanceAsset, FinanceGoal, FinanceTransaction, RecurringFinanceItem } from "../types/tracker";
+import type { FinanceAccount, FinanceAsset, FinanceBudget, FinanceGoal, FinanceTransaction, RecurringFinanceItem } from "../types/tracker";
 const accountsRef = (uid: string) => collection(db, "users", uid, "finance_accounts");
 const transactionsRef = (uid: string) => collection(db, "users", uid, "finance_transactions");
 const assetsRef = (uid: string) => collection(db, "users", uid, "finance_assets");
 const goalsRef = (uid: string) => collection(db, "users", uid, "finance_goals");
 const recurringRef = (uid: string) => collection(db, "users", uid, "finance_recurring");
+const budgetsRef = (uid: string) => collection(db, "users", uid, "finance_budgets");
 export const subscribeToFinanceAccounts = (uid: string, cb: (items: FinanceAccount[]) => void): Unsubscribe => onSnapshot(query(accountsRef(uid), orderBy("createdAt", "asc")), snap => cb(snap.docs.map(item => ({ id: item.id, ...item.data() } as FinanceAccount))));
 export const subscribeToFinanceTransactions = (uid: string, cb: (items: FinanceTransaction[]) => void): Unsubscribe => onSnapshot(query(transactionsRef(uid), orderBy("date", "desc")), snap => cb(snap.docs.map(item => ({ id: item.id, ...item.data() } as FinanceTransaction))));
 export const createFinanceAccount = (uid: string, input: Omit<FinanceAccount, "id" | "createdAt">) => setDoc(doc(accountsRef(uid)), { ...input, createdAt: serverTimestamp() });
 export const createFinanceTransaction = (uid: string, input: Omit<FinanceTransaction, "id" | "createdAt">) => { if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("Amount must be greater than zero."); if (input.type === "transfer" && (!input.toAccountId || input.toAccountId === input.accountId)) throw new Error("Choose a different destination account."); return setDoc(doc(transactionsRef(uid)), { ...input, createdAt: serverTimestamp() }); };
 export const archiveFinanceAccount = (uid: string, id: string) => updateDoc(doc(accountsRef(uid), id), { archived: true });
+export const restoreFinanceAccount = (uid: string, id: string) => updateDoc(doc(accountsRef(uid), id), { archived: false });
 export const reverseFinanceTransaction = (uid: string, original: FinanceTransaction) => createFinanceTransaction(uid, { ...original, type: original.type === "income" ? "expense" : original.type === "expense" ? "income" : "transfer", accountId: original.type === "transfer" ? original.toAccountId || original.accountId : original.accountId, toAccountId: original.type === "transfer" ? original.accountId : null, reversalOf: original.id, description: `Reversal: ${original.description || original.category}` });
 export const subscribeToFinanceAssets = (uid: string, cb: (items: FinanceAsset[]) => void): Unsubscribe => onSnapshot(query(assetsRef(uid), orderBy("createdAt", "asc")), snap => cb(snap.docs.map(item => ({ id: item.id, ...item.data() } as FinanceAsset))));
 export const subscribeToFinanceGoals = (uid: string, cb: (items: FinanceGoal[]) => void): Unsubscribe => onSnapshot(query(goalsRef(uid), orderBy("createdAt", "asc")), snap => cb(snap.docs.map(item => ({ id: item.id, ...item.data() } as FinanceGoal))));
@@ -18,3 +20,6 @@ export const subscribeToRecurringFinanceItems = (uid: string, cb: (items: Recurr
 export const createFinanceAsset = (uid: string, input: Omit<FinanceAsset, "id" | "createdAt">) => setDoc(doc(assetsRef(uid)), { ...input, createdAt: serverTimestamp() });
 export const createFinanceGoal = (uid: string, input: Omit<FinanceGoal, "id" | "createdAt">) => setDoc(doc(goalsRef(uid)), { ...input, createdAt: serverTimestamp() });
 export const createRecurringFinanceItem = (uid: string, input: Omit<RecurringFinanceItem, "id" | "createdAt">) => setDoc(doc(recurringRef(uid)), { ...input, createdAt: serverTimestamp() });
+export const subscribeToFinanceBudgets = (uid: string, cb: (items: FinanceBudget[]) => void): Unsubscribe => onSnapshot(query(budgetsRef(uid), orderBy("month", "desc")), snap => cb(snap.docs.map(item => ({ id: item.id, ...item.data() } as FinanceBudget))));
+export const saveFinanceBudget = (uid: string, input: Omit<FinanceBudget, "id" | "createdAt">) => setDoc(doc(budgetsRef(uid), `${input.month}-${input.scope}-${input.category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`), { ...input, createdAt: serverTimestamp() }, { merge: true });
+export const postRecurringFinanceItem = (uid: string, item: RecurringFinanceItem, date: string) => setDoc(doc(transactionsRef(uid), `recurring-${item.id}-${date}`), { type: item.type, amount: item.amount, accountId: item.accountId, toAccountId: item.toAccountId || null, category: item.category, scope: item.scope, projectId: item.projectId || null, date, description: item.description || `Recurring: ${item.category}`, reversalOf: null, recurringItemId: item.id, createdAt: serverTimestamp() }, { merge: false });
