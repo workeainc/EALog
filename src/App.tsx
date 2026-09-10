@@ -14,6 +14,7 @@ import {
   FolderKanban,
   LayoutDashboard,
   KeyRound,
+  Landmark,
   ListTodo,
   StickyNote,
   Menu,
@@ -39,6 +40,7 @@ import TodosView from "./components/TodosView";
 import NotesView from "./components/NotesView";
 import VaultView from "./components/VaultView";
 import DisciplineView from "./components/DisciplineView";
+import FinanceView from "./components/FinanceView";
 import AppModeControl from "./components/AppModeControl";
 import { effectiveAppMode, saveAppMode, subscribeToAppMode, WORKDAY_MODE } from "./lib/mode-service";
 import { summarizeNote } from "./lib/summarize";
@@ -59,6 +61,8 @@ import {
   type Routine,
   type RoutineLog,
   type AppModeState,
+  type FinanceAccount,
+  type FinanceTransaction,
 } from "./types/tracker";
 import {
   localDateKey,
@@ -140,10 +144,10 @@ const DEMO_LOGS: ReportLog[] = [
 const mins = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}h ${Math.max(0, minutes) % 60 ? `${Math.max(0, minutes) % 60}m` : ""}`;
 type View =
-  "overview" | "projects" | "reports" | "sessions" | "todos" | "notes" | "vault" | "discipline" | "settings";
+  "overview" | "projects" | "reports" | "sessions" | "todos" | "notes" | "vault" | "discipline" | "finance" | "settings";
 
 const NAVIGATION_VIEWS: View[] = [
-  "overview", "projects", "reports", "sessions", "todos", "notes", "vault", "discipline", "settings",
+  "overview", "projects", "reports", "sessions", "todos", "notes", "vault", "discipline", "finance", "settings",
 ];
 
 function viewFromLocation(): View {
@@ -206,6 +210,8 @@ export default function App() {
   const [dueRoutine, setDueRoutine] = useState<Routine | null>(null);
   const [routineWarning, setRoutineWarning] = useState<Routine | null>(null);
   const [appMode, setAppMode] = useState<AppModeState>(WORKDAY_MODE);
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [financeTransactions, setFinanceTransactions] = useState<FinanceTransaction[]>([]);
   const activeAppMode = effectiveAppMode(appMode, localDateKey(new Date(now)), now);
   const vacationActive = activeAppMode === "vacation";
   const [sessionFilter, setSessionFilter] = useState<
@@ -317,15 +323,18 @@ export default function App() {
     let offRoutines: () => void = () => {};
     let offRoutineLogs: () => void = () => {};
     let offAppMode: () => void = () => {};
+    let offFinanceAccounts: () => void = () => {};
+    let offFinanceTransactions: () => void = () => {};
     const todoUnsubscribers: Array<() => void> = [];
     (async () => {
       try {
-        const [{ auth }, service, todoService, noteService, routineService, authSdk] = await Promise.all([
+        const [{ auth }, service, todoService, noteService, routineService, financeService, authSdk] = await Promise.all([
           import("./lib/firebase"),
           import("./lib/tracker-service"),
           import("./lib/todo-service"),
           import("./lib/note-service"),
           import("./lib/routine-service"),
+          import("./lib/finance-service"),
           import("firebase/auth"),
         ]);
         // Restore the persisted browser session before deciding whether
@@ -433,6 +442,8 @@ export default function App() {
         offRoutines = routineService.subscribeToRoutines(user.uid, setRoutines);
         offRoutineLogs = routineService.subscribeToRoutineLogs(user.uid, setRoutineLogs);
         offAppMode = subscribeToAppMode(user.uid, setAppMode);
+        offFinanceAccounts = financeService.subscribeToFinanceAccounts(user.uid, setFinanceAccounts);
+        offFinanceTransactions = financeService.subscribeToFinanceTransactions(user.uid, setFinanceTransactions);
         const todoFrom = new Date();
         todoFrom.setDate(todoFrom.getDate() - 90);
         const todoTo = new Date();
@@ -532,6 +543,8 @@ export default function App() {
       offRoutines();
       offRoutineLogs();
       offAppMode();
+      offFinanceAccounts();
+      offFinanceTransactions();
       todoUnsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [firebaseConfigured]);
@@ -1404,6 +1417,10 @@ export default function App() {
             <Sparkles size={18} />
             Discipline
           </a>
+          <a className={view === "finance" ? "active" : ""} onClick={() => { setView("finance"); setMobileNav(false); }}>
+            <Landmark size={18} />
+            Finance
+          </a>
           <div className={`sidebar-projects ${projectNavOpen ? "open" : ""}`}>
             <button
               className={view === "projects" ? "active" : ""}
@@ -1584,6 +1601,8 @@ export default function App() {
           uid ? <VaultView uid={uid} projects={projects} /> : null
         ) : view === "discipline" ? (
           uid ? <DisciplineView uid={uid} routines={routines} logs={routineLogs} /> : null
+        ) : view === "finance" ? (
+          uid ? <FinanceView accounts={financeAccounts} transactions={financeTransactions} projects={projects} onAccount={async input => { const service = await import("./lib/finance-service"); await service.createFinanceAccount(uid, input); }} onTransaction={async input => { const service = await import("./lib/finance-service"); await service.createFinanceTransaction(uid, input); }} /> : null
         ) : view === "reports" ? (
           <ReportsView
             projects={projects}

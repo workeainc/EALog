@@ -24,6 +24,10 @@ export interface AppModeState {
   relaxedDiscipline?: boolean;
   updatedAt?: Timestamp | null;
 }
+export type FinanceAccountKind = "cash" | "savings" | "investment" | "liability";
+export type FinanceTransactionType = "income" | "expense" | "transfer";
+export interface FinanceAccount { id: string; name: string; kind: FinanceAccountKind; openingBalance: number; createdAt: Timestamp | null; }
+export interface FinanceTransaction { id: string; type: FinanceTransactionType; amount: number; accountId: string; toAccountId?: string | null; category: string; scope: "personal" | "business"; projectId?: string | null; date: string; description: string; createdAt: Timestamp | null; }
 export interface Routine { id: string; name: string; category: RoutineCategory; priority: "critical" | "high" | "normal"; time: string; durationMinutes: number; windowMinutes: number; repeatDays: number[]; reminderMinutes: number; sessionBehavior: "warn" | "pause"; strict: boolean; active: boolean; /** Optional inclusive plan range; omitted routines stay evergreen. */ effectiveDate?: string; endDate?: string; createdAt: Timestamp | null; updatedAt: Timestamp | null; }
 export interface RoutineLog { id: string; routineId: string; dateString: string; status: RoutineStatus; completedAt: Timestamp | null; skippedReason?: string; snoozedUntil?: string; }
 

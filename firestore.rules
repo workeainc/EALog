@@ -57,6 +57,14 @@ service cloud.firestore {
       match /routine_logs/{routineLogId} {
         allow read, create, update, delete: if isOwner(userId);
       }
+
+      match /finance_accounts/{accountId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
+
+      match /finance_transactions/{transactionId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
     }
   }
 }
