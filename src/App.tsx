@@ -19,6 +19,7 @@ import {
   Play,
   Plus,
   Pencil,
+  Palmtree,
   Settings,
   Search,
   Square,
@@ -37,6 +38,8 @@ import TodosView from "./components/TodosView";
 import NotesView from "./components/NotesView";
 import VaultView from "./components/VaultView";
 import DisciplineView from "./components/DisciplineView";
+import AppModeControl from "./components/AppModeControl";
+import { effectiveAppMode, saveAppMode, subscribeToAppMode, WORKDAY_MODE } from "./lib/mode-service";
 import { summarizeNote } from "./lib/summarize";
 import {
   aggregateReportRows,
@@ -54,6 +57,7 @@ import {
   type TrackerProfile,
   type Routine,
   type RoutineLog,
+  type AppModeState,
 } from "./types/tracker";
 import {
   localDateKey,
@@ -200,6 +204,9 @@ export default function App() {
   const [routineLogs, setRoutineLogs] = useState<RoutineLog[]>([]);
   const [dueRoutine, setDueRoutine] = useState<Routine | null>(null);
   const [routineWarning, setRoutineWarning] = useState<Routine | null>(null);
+  const [appMode, setAppMode] = useState<AppModeState>(WORKDAY_MODE);
+  const activeAppMode = effectiveAppMode(appMode, localDateKey(new Date(now)), now);
+  const vacationActive = activeAppMode === "vacation";
   const [sessionFilter, setSessionFilter] = useState<
     "last2" | "last7" | "last30" | "custom"
   >(
@@ -262,7 +269,8 @@ export default function App() {
     const toMinutes = (time: string) => { const [hour, minute] = time.split(":").map(Number); return hour * 60 + minute; };
     const check = async () => {
       const now = new Date(); const today = localDateKey(now); const nowMinutes = now.getHours() * 60 + now.getMinutes();
-      const applicable = routines.filter((routine) => routine.active && routine.repeatDays.includes(now.getDay()) && (!routine.effectiveDate || routine.effectiveDate <= today) && (!routine.endDate || routine.endDate >= today));
+      const vacation = effectiveAppMode(appMode, today) === "vacation";
+      const applicable = routines.filter((routine) => routine.active && routine.repeatDays.includes(now.getDay()) && (!routine.effectiveDate || routine.effectiveDate <= today) && (!routine.endDate || routine.endDate >= today) && (!vacation || !appMode.relaxedDiscipline || !/focus block|deep work|work session/i.test(routine.name)));
       const logFor = (routine: Routine) => routineLogs.find((log) => log.routineId === routine.id && log.dateString === today);
       for (const routine of applicable) {
         const log = logFor(routine); const scheduled = toMinutes(routine.time);
@@ -282,7 +290,7 @@ export default function App() {
       }
     };
     void check(); const interval = window.setInterval(() => void check(), 30000); return () => window.clearInterval(interval);
-  }, [uid, routines, routineLogs, running, paused, tracker, dueRoutine, routineWarning]);
+  }, [uid, routines, routineLogs, running, paused, tracker, dueRoutine, routineWarning, appMode]);
   const [showAddProject, setShowAddProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectTarget, setNewProjectTarget] = useState("60");
@@ -307,6 +315,7 @@ export default function App() {
     let offNotes: () => void = () => {};
     let offRoutines: () => void = () => {};
     let offRoutineLogs: () => void = () => {};
+    let offAppMode: () => void = () => {};
     const todoUnsubscribers: Array<() => void> = [];
     (async () => {
       try {
@@ -422,6 +431,7 @@ export default function App() {
         offNotes = noteService.subscribeToNotes(user.uid, setNotes);
         offRoutines = routineService.subscribeToRoutines(user.uid, setRoutines);
         offRoutineLogs = routineService.subscribeToRoutineLogs(user.uid, setRoutineLogs);
+        offAppMode = subscribeToAppMode(user.uid, setAppMode);
         const todoFrom = new Date();
         todoFrom.setDate(todoFrom.getDate() - 90);
         const todoTo = new Date();
@@ -520,6 +530,7 @@ export default function App() {
       offNotes();
       offRoutines();
       offRoutineLogs();
+      offAppMode();
       todoUnsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [firebaseConfigured]);
@@ -761,6 +772,14 @@ export default function App() {
   );
 
   const begin = async () => {
+    if (vacationActive) {
+      setSyncError("Vacation mode is active. Work tracking resumes after your vacation.");
+      return;
+    }
+    if (activeAppMode === "break") {
+      setSyncError("End your break before starting a work session.");
+      return;
+    }
     if (!selectedProject)
       return setSyncError("Select an active project first.");
     try {
@@ -795,6 +814,10 @@ export default function App() {
     }
   };
   const resume = async () => {
+    if (vacationActive || activeAppMode === "break") {
+      setSyncError(vacationActive ? "Vacation mode is active. Work tracking is unavailable." : "End your break before resuming work.");
+      return;
+    }
     try {
       if (uid && tracker) await tracker.resumeSession(uid);
       else {
@@ -806,6 +829,29 @@ export default function App() {
     } catch (error: any) {
       setSyncError(error?.message || "Could not resume session.");
     }
+  };
+  const startBreak = async (minutes: number, reason: string) => {
+    if (vacationActive) throw new Error("Vacation mode is active.");
+    if (running && !paused) await pause();
+    const next: AppModeState = {
+      mode: "break",
+      breakStartedAt: new Date().toISOString(),
+      breakExpectedEndAt: new Date(Date.now() + minutes * 60_000).toISOString(),
+      breakReason: reason || "Recovery break",
+    };
+    setAppMode(next);
+    if (uid) await saveAppMode(uid, next);
+  };
+  const resumeWorkMode = async () => {
+    setAppMode(WORKDAY_MODE);
+    if (uid) await saveAppMode(uid, WORKDAY_MODE);
+  };
+  const planVacation = async (startDate: string, endDate: string, reason: string, relaxedDiscipline: boolean) => {
+    if (endDate < startDate) throw new Error("Vacation end date must be after its start date.");
+    if (startDate <= localDateKey() && localDateKey() <= endDate && running && !paused) await pause();
+    const next: AppModeState = { mode: "vacation", vacationStartDate: startDate, vacationEndDate: endDate, vacationReason: reason, relaxedDiscipline };
+    setAppMode(next);
+    if (uid) await saveAppMode(uid, next);
   };
   const openFinishModal = (projectId: string) => {
     setSessionTodoIds([]);
@@ -1434,6 +1480,16 @@ export default function App() {
             </button>
           </div>
         )}
+        <div className="app-mode-global">
+          <AppModeControl
+            mode={activeAppMode}
+            state={appMode}
+            onStartBreak={startBreak}
+            onResumeWork={resumeWorkMode}
+            onPlanVacation={planVacation}
+            onEndVacation={resumeWorkMode}
+          />
+        </div>
         {view !== "sessions" && view !== "projects" && view !== "todos" && view !== "notes" && view !== "vault" && <header>
           <button className="menu-button" onClick={() => setMobileNav(true)}>
             <Menu />
@@ -1463,7 +1519,15 @@ export default function App() {
             </div>
           </div>
         </header>}
-        {view === "projects" ? (
+        {vacationActive && !["discipline", "reports", "notes", "settings"].includes(view) ? (
+          <VacationModePanel
+            state={appMode}
+            routines={routines}
+            logs={routineLogs}
+            onOpenDiscipline={() => setView("discipline")}
+            onEndVacation={resumeWorkMode}
+          />
+        ) : view === "projects" ? (
           <ProjectsView
             projects={projects}
             logs={monthLogs}
@@ -2229,6 +2293,16 @@ export default function App() {
       )}
     </div>
   );
+}
+
+function VacationModePanel({ state, routines, logs, onOpenDiscipline, onEndVacation }: { state: AppModeState; routines: Routine[]; logs: RoutineLog[]; onOpenDiscipline: () => void; onEndVacation: () => Promise<void> }) {
+  const today = localDateKey();
+  const todayDay = new Date(`${today}T12:00:00`).getDay();
+  const todayRoutines = routines.filter((routine) => routine.active && routine.repeatDays.includes(todayDay) && (!routine.effectiveDate || routine.effectiveDate <= today) && (!routine.endDate || routine.endDate >= today));
+  const completed = todayRoutines.filter((routine) => logs.find((log) => log.id === `${routine.id}-${today}`)?.status === "completed").length;
+  const days = state.vacationStartDate && state.vacationEndDate ? Math.max(1, Math.floor((new Date(`${state.vacationEndDate}T12:00:00`).getTime() - new Date(`${state.vacationStartDate}T12:00:00`).getTime()) / 86_400_000) + 1) : 1;
+  const currentDay = state.vacationStartDate ? Math.max(1, Math.floor((new Date(`${today}T12:00:00`).getTime() - new Date(`${state.vacationStartDate}T12:00:00`).getTime()) / 86_400_000) + 1) : 1;
+  return <section className="vacation-mode-panel"><div className="vacation-mark"><Palmtree size={31} /></div><span className="eyebrow">VACATION MODE</span><h2>You’re off work.</h2><p>{state.vacationStartDate} – {state.vacationEndDate} · Day {Math.min(currentDay, days)} of {days}</p>{state.vacationReason && <small>{state.vacationReason}</small>}<div className="vacation-mode-stats"><article><b>Work tracking</b><span>Paused</span></article><article><b>Tasks & projects</b><span>On hold</span></article><article><b>Personal routines</b><span>{completed} / {todayRoutines.length} complete</span></article></div><p className="vacation-reassurance">No daily target or overdue-task pressure while you are away. Your personal discipline remains available.</p><div><button className="outline-btn" onClick={onOpenDiscipline}>View today’s discipline</button><button className="start-btn" onClick={() => void onEndVacation()}>End vacation</button></div></section>;
 }
 
 function MonthlyMap({
