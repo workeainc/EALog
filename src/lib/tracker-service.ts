@@ -444,7 +444,11 @@ export async function createProject(
       },
     ],
   };
-  await setDoc(doc(projectsRef(uid), id), { ...project, id: undefined });
+  // Firestore rejects `undefined` fields.  Keeping the id only in the
+  // document path guarantees a newly-created project is accepted both online
+  // and from the SDK's local persistence queue.
+  const { id: _id, ...projectData } = project;
+  await setDoc(doc(projectsRef(uid), id), projectData);
   return project;
 }
 

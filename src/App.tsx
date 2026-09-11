@@ -179,6 +179,9 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(DEMO_PROJECTS[0].id);
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
+  // The active-session document is the sole authority for the project being
+  // timed.  `selectedId` is only the next project chosen while idle.
+  const [activeSessionProjectId, setActiveSessionProjectId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [accumulatedSeconds, setAccumulatedSeconds] = useState(0);
   const [now, setNow] = useState(Date.now());
@@ -518,6 +521,7 @@ export default function App() {
             if (disposed) return;
             setRunning(Boolean(active));
             setPaused(Boolean(active?.pausedAt));
+            setActiveSessionProjectId(active?.projectId || null);
             setAccumulatedSeconds(
               Math.max(0, Number(active?.accumulatedSeconds) || 0),
             );
@@ -640,17 +644,19 @@ export default function App() {
   }, []);
 
   const selectedProject = projects.find((project) => project.id === selectedId);
-  const finishProject = projects.find((project) => project.id === (finishProjectId || selectedId));
+  const timerProjectId = activeSessionProjectId || selectedId;
+  const timerProject = projects.find((project) => project.id === timerProjectId);
+  const finishProject = projects.find((project) => project.id === (finishProjectId || timerProjectId));
   const sessionOpenTodos = useMemo(
-    () => sortTodos(todos.filter((todo) => todo.status === "open" && todo.projectId === (finishProjectId || selectedId))),
-    [todos, finishProjectId, selectedId],
+    () => sortTodos(todos.filter((todo) => todo.status === "open" && todo.projectId === (finishProjectId || timerProjectId))),
+    [todos, finishProjectId, timerProjectId],
   );
   const elapsed = startedAt
     ? accumulatedSeconds +
       (paused ? 0 : Math.max(0, Math.floor((now - startedAt) / 1000)))
     : accumulatedSeconds;
   useEffect(() => {
-    const targetSeconds = (selectedProject?.targetMinutes || 0) * 60;
+    const targetSeconds = (timerProject?.targetMinutes || 0) * 60;
     if (
       !running ||
       !targetSeconds ||
@@ -661,7 +667,7 @@ export default function App() {
     targetAlertedRef.current = true;
     setTargetReached(true);
     playTargetTone();
-  }, [elapsed, running, selectedProject?.targetMinutes, playTargetTone]);
+  }, [elapsed, running, timerProject?.targetMinutes, playTargetTone]);
   const todayAggregate = useMemo(
     () => aggregateReportRows(normalizeReportLogs(todayLogs), timezone),
     [todayLogs, timezone],
@@ -951,7 +957,7 @@ export default function App() {
         const end = new Date();
         const local: ReportLog = {
           id: `local-${end.getTime()}`,
-          projectId: selectedId,
+          projectId: timerProjectId,
           startTime: start,
           endTime: end,
           durationMinutes: Math.max(1, Math.round(elapsed / 60)),
@@ -1004,9 +1010,16 @@ export default function App() {
     setAddingProject(true);
     setAddProjectError("");
     try {
-      if (uid && tracker)
-        await tracker.createProject(uid, { name, targetMinutes });
-      else {
+      if (uid && tracker) {
+        const created = await tracker.createProject(uid, { name, targetMinutes });
+        // Do not wait for a later remote snapshot before the new project is
+        // usable.  The listener reconciles this optimistic entry by id.
+        setProjects((items) => [
+          ...items.filter((project) => project.id !== created.id),
+          created,
+        ].sort((a, b) => a.sortOrder - b.sortOrder));
+        setSelectedId(created.id);
+      } else {
         const id = createProjectId(
           name,
           projects.map((project) => project.id),
@@ -1773,7 +1786,7 @@ export default function App() {
                   <select
                     id="working-project"
                     name="working-project"
-                    value={selectedId}
+                    value={running ? activeSessionProjectId || selectedId : selectedId}
                     onChange={(event) => setSelectedId(event.target.value)}
                     disabled={running}
                   >
@@ -1804,12 +1817,10 @@ export default function App() {
                     <button
                       className="stop-btn"
                       onClick={() => {
-                        // Read the disabled timer selector itself at click
-                        // time. This is the canonical UI value even if an
-                        // older active-session callback is reconciling state
-                        // in the same React turn.
-                        const timerProjectId = (document.getElementById("working-project") as HTMLSelectElement | null)?.value;
-                        openFinishModal(timerProjectId || selectedProject?.id || selectedId);
+                        // Never derive a completed session from a visual
+                        // selector.  The active-session document is the
+                        // authoritative project identity for this timer.
+                        openFinishModal(activeSessionProjectId || selectedId);
                       }}
                     >
                       <Square size={15} fill="currentColor" /> End session
