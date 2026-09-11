@@ -425,6 +425,10 @@ export default function App() {
                 : items.find((project) => project.active)?.id || "",
             );
           },
+          (error: Error) => {
+            if (!disposed)
+              setSyncError(error.message || "Projects could not be synced.");
+          },
         );
         offLogs = service.subscribeToWorkLogs(
           user.uid,

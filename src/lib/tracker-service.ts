@@ -28,6 +28,10 @@ import {
 } from "./offline-outbox";
 import { toDateString } from "./date";
 import {
+  assertWorkLogMatchesActiveSession,
+  projectIdFromActiveSession,
+} from "./session-project";
+import {
   createProjectId,
   type ActiveSession,
   type Project,
@@ -238,7 +242,7 @@ function serializeSession(
   revision: number,
 ): StoredSession {
   return {
-    projectId: session.projectId,
+    projectId: projectIdFromActiveSession(session),
     startTime: session.startTime.toMillis(),
     segmentStartedAt: (
       session.segmentStartedAt ?? session.startTime
@@ -252,7 +256,7 @@ function serializeSession(
 function deserializeSession(value: StoredSession): ActiveSession {
   return withRevision(
     {
-      projectId: value.projectId,
+      projectId: projectIdFromActiveSession(value),
       startTime: Timestamp.fromMillis(value.startTime),
       segmentStartedAt: Timestamp.fromMillis(value.segmentStartedAt),
       accumulatedSeconds: value.accumulatedSeconds,
@@ -348,20 +352,22 @@ export async function updateProfile(
 export function subscribeToProjects(
   uid: string,
   callback: (projects: Project[]) => void,
+  onError?: (error: Error) => void,
 ): Unsubscribe {
   return onSnapshot(
     query(projectsRef(uid), orderBy("sortOrder")),
     (snapshot) => {
-      const projects = snapshot.docs.map((item) => {
+      const projects = snapshot.docs.flatMap((item) => {
         const value = item.data();
         if (
           typeof value.name !== "string" ||
           !value.name.trim() ||
           !Number.isFinite(value.targetMinutes)
         ) {
-          throw new Error(`Project "${item.id}" has invalid configuration.`);
+          onError?.(new Error(`Project "${item.id}" has invalid configuration and was skipped.`));
+          return [];
         }
-        return {
+        return [{
           id: item.id,
           name: value.name.trim(),
           targetMinutes: Math.max(1, Math.round(value.targetMinutes)),
@@ -402,10 +408,11 @@ export function subscribeToProjects(
           referenceUrl:
             typeof value.referenceUrl === "string" ? value.referenceUrl : "",
           targetSchedule: cleanProjectSchedule(value.targetSchedule),
-        } satisfies Project;
+        } satisfies Project];
       });
       callback(projects);
     },
+    (error) => onError?.(error),
   );
 }
 export async function createProject(
@@ -547,6 +554,7 @@ async function applyCommand(
       if (remoteRevision !== payload.baseRevision)
         throw new Error("Conflict: remote session changed on another device.");
       const log = payload.log;
+      assertWorkLogMatchesActiveSession(remote, log);
       tx.set(logRef, {
         ...log,
         startTime: Timestamp.fromMillis(log.startTime),
@@ -561,6 +569,8 @@ async function applyCommand(
       throw new Error("Conflict: remote session changed on another device.");
     if (!payload.session) throw new Error("Invalid timer command.");
     const next = deserializeSession(payload.session);
+    if (projectIdFromActiveSession(remote) !== projectIdFromActiveSession(next))
+      throw new Error("Project mismatch: timer mutation cannot change the active project.");
     tx.update(ref, {
       ...next,
       revision: remoteRevision + 1,
@@ -732,21 +742,25 @@ export async function stopSession(
   if (!cleanNotes) throw new Error("A session note is required.");
   const current = local.get(uid);
   if (!current?.session) throw new Error("There is no active session to stop.");
+  const session = current.session;
   const operationId = opId("stop");
   const log: StoredLog = {
     id: operationId,
-    projectId: current.session.projectId,
-    startTime: current.session.startTime.toMillis(),
+    projectId: projectIdFromActiveSession(session),
+    startTime: session.startTime.toMillis(),
     endTime: now.getTime(),
     durationMinutes: Math.max(
       1,
-      Math.round(elapsed(current.session, now) / 60),
+      Math.round(elapsed(session, now) / 60),
     ),
     notes: cleanNotes,
     details: details?.trim() || undefined,
-    dateString: current.session.dateString,
+    dateString: session.dateString,
     createdAt: now.getTime(),
   };
+  // Development and production both fail closed. There is no write path from
+  // an active session to a differently-linked work log.
+  assertWorkLogMatchesActiveSession(session, log);
   local.set(uid, { session: null, revision: current.revision });
   publishActive(uid);
   const command = {
