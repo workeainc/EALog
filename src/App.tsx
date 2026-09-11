@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowLeft,
+  ArrowLeftRight,
   BarChart3,
   Bell,
   CalendarDays,
@@ -9,11 +10,13 @@ import {
   ChevronDown,
   CircleHelp,
   Clock3,
+  Coffee,
   Download,
   Flame,
   FolderKanban,
   LayoutDashboard,
   KeyRound,
+  Heart,
   Landmark,
   ListTodo,
   StickyNote,
@@ -247,6 +250,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [view, setView] = useState<View>(viewFromLocation);
   const [projectNavOpen, setProjectNavOpen] = useState(true);
+  const [lifeNavOpen, setLifeNavOpen] = useState(true);
+  const [financeNavOpen, setFinanceNavOpen] = useState(false);
   const [projectDashboardId, setProjectDashboardId] = useState<string | null>(
     null,
   );
@@ -1396,9 +1401,7 @@ export default function App() {
           <div className="brand-mark">
             <Activity size={18} />
           </div>
-          <span>
-            work<span>hours</span>
-          </span>
+          <span>EA Log<small>Work · Life · Money</small></span>
           <button className="mobile-close" onClick={() => setMobileNav(false)}>
             <X size={20} />
           </button>
@@ -1412,6 +1415,7 @@ export default function App() {
           <ChevronDown size={15} />
         </div>
         <nav>
+          <span className="sidebar-group-label">Main</span>
           <a
             className={view === "overview" ? "active" : ""}
             onClick={() => {
@@ -1421,42 +1425,6 @@ export default function App() {
           >
             <LayoutDashboard size={18} />
             Overview
-          </a>
-          <a
-            className={view === "sessions" ? "active" : ""}
-            onClick={() => {
-              setView("sessions");
-              setMobileNav(false);
-            }}
-          >
-            <Clock3 size={18} />
-            Sessions
-          </a>
-          <a
-            className={view === "todos" ? "active" : ""}
-            onClick={() => {
-              setView("todos");
-              setMobileNav(false);
-            }}
-          >
-            <ListTodo size={18} />
-            Tasks
-          </a>
-          <a className={view === "notes" ? "active" : ""} onClick={() => { setNotesProjectId(null); setNotesFocusId(null); setView("notes"); setMobileNav(false); }}>
-            <StickyNote size={18} />
-            Notes
-          </a>
-          <a className={view === "vault" ? "active" : ""} onClick={() => { setView("vault"); setMobileNav(false); }}>
-            <KeyRound size={18} />
-            Vault
-          </a>
-          <a className={view === "discipline" ? "active" : ""} onClick={() => { setView("discipline"); setMobileNav(false); }}>
-            <Sparkles size={18} />
-            Discipline
-          </a>
-          <a className={view === "finance" ? "active" : ""} onClick={() => { setView("finance"); setMobileNav(false); }}>
-            <Landmark size={18} />
-            Finance
           </a>
           <div className={`sidebar-projects ${projectNavOpen ? "open" : ""}`}>
             <button
@@ -1470,6 +1438,7 @@ export default function App() {
               <span>
                 <FolderKanban size={18} /> Projects
               </span>
+              {activeProjects.length > 0 && <em>{activeProjects.length}</em>}
               <ChevronDown size={15} />
             </button>
             {projectNavOpen && (
@@ -1501,6 +1470,19 @@ export default function App() {
             )}
           </div>
           <a
+            className={view === "todos" ? "active" : ""}
+            onClick={() => { setView("todos"); setMobileNav(false); }}
+          >
+            <ListTodo size={18} />
+            Tasks {todayTodoStats.open > 0 && <em>{todayTodoStats.open}</em>}
+          </a>
+          <a className={view === "notes" ? "active" : ""} onClick={() => { setNotesProjectId(null); setNotesFocusId(null); setView("notes"); setMobileNav(false); }}>
+            <StickyNote size={18} /> Notes
+          </a>
+          <a className={view === "sessions" ? "active" : ""} onClick={() => { setView("sessions"); setMobileNav(false); }}>
+            <Clock3 size={18} /> Sessions
+          </a>
+          <a
             className={view === "reports" ? "active" : ""}
             onClick={() => {
               setView("reports");
@@ -1509,6 +1491,31 @@ export default function App() {
           >
             <BarChart3 size={18} />
             Reports
+          </a>
+          <div className="sidebar-divider" />
+          <div className={`sidebar-section ${lifeNavOpen ? "open" : ""}`}>
+            <button className="sidebar-section-head" onClick={() => setLifeNavOpen((open) => !open)}>
+              <span><Heart size={18} /> Life</span><ChevronDown size={15} />
+            </button>
+            {lifeNavOpen && <div className="sidebar-section-items">
+              <a className={view === "discipline" ? "active" : ""} onClick={() => { setView("discipline"); setMobileNav(false); }}><Sparkles size={18} /> Discipline {routines.filter((routine) => routine.active).length > 0 && <em>{routines.filter((routine) => routine.active).length}</em>}</a>
+              <a className={vacationActive ? "mode-active" : ""} onClick={() => { setView("discipline"); setMobileNav(false); }}><Palmtree size={18} /> Vacation {vacationActive && <i />}</a>
+              <a className={activeAppMode === "break" ? "mode-active" : ""} onClick={() => { setView("discipline"); setMobileNav(false); }}><Coffee size={18} /> Break {activeAppMode === "break" && <i />}</a>
+            </div>}
+          </div>
+          <div className="sidebar-divider" />
+          <div className={`sidebar-section finance-section ${financeNavOpen ? "open" : ""}`}>
+            <button className="sidebar-section-head" onClick={() => { setFinanceNavOpen((open) => !open); setView("finance"); }}>
+              <span><Landmark size={18} /> Finance</span><ChevronDown size={15} />
+            </button>
+            {financeNavOpen && <div className="sidebar-section-items">
+              <a className={view === "finance" ? "active" : ""} onClick={() => { setView("finance"); setMobileNav(false); }}><LayoutDashboard size={17} /> Overview</a>
+              <a onClick={() => { setView("finance"); setMobileNav(false); }}><ArrowLeftRight size={17} /> Transactions</a>
+              <a onClick={() => { setView("finance"); setMobileNav(false); }}><Landmark size={17} /> Accounts</a>
+            </div>}
+          </div>
+          <a className={view === "vault" ? "active" : ""} onClick={() => { setView("vault"); setMobileNav(false); }}>
+            <KeyRound size={18} /> Vault
           </a>
         </nav>
         <div className="nav-bottom">
@@ -1526,6 +1533,7 @@ export default function App() {
             <CircleHelp size={18} />
             Help center
           </a>
+          <div className="sidebar-focus-hint"><Sparkles size={16} /><span>Focus today<small>Protect the important.</small></span></div>
         </div>
       </aside>
       <main className="main">
