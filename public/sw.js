@@ -1,4 +1,4 @@
-const CACHE = 'ea-log-shell-v6';
+const CACHE = 'ea-log-shell-v7';
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['/','/index.html','/manifest.webmanifest'])));
   self.skipWaiting();
@@ -18,7 +18,9 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || request.method !== 'GET' || url.pathname.includes('/__/')) return;
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match('/index.html')));
+    // The document carries the CSP. Always bypass the browser's HTTP cache for
+    // navigations so a deployed security-policy/auth repair is immediate.
+    event.respondWith(fetch(request, { cache: 'reload' }).catch(() => caches.match('/index.html')));
     return;
   }
   // Hashed build assets should always prefer the network. This ensures a
