@@ -383,17 +383,21 @@ export default function App() {
         // a new Google sign-in is needed. Without this wait, a refresh
         // can briefly report currentUser as null and reopen the popup.
         await setBestAuthPersistence(auth, authSdk);
-        let redirectResult: any = null;
-        try {
-          redirectResult = await authSdk.getRedirectResult(auth);
-        } catch {
-          // Google popup is the standard sign-in path. A stale redirect
-          // resolver can fail in Safari/PWA with auth/internal-error even
-          // when the persisted Firebase user is healthy. It is never a
-          // workspace-sync error, so ignore it and restore auth below.
-          redirectResult = null;
-        }
-        await auth.authStateReady();
+        // `getRedirectResult` may wait indefinitely in some PWA/Safari
+        // contexts even when no redirect was requested. It is only needed for
+        // the redirect fallback, never for restoring an existing user, so it
+        // must not block the whole workspace boot path.
+        const redirectResultPromise = authSdk
+          .getRedirectResult(auth)
+          .catch(() => null);
+        await Promise.race([
+          auth.authStateReady(),
+          new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
+        ]);
+        const redirectResult = await Promise.race<any>([
+          redirectResultPromise,
+          new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 1500)),
+        ]);
         let user = redirectResult?.user || auth.currentUser;
         if (!user) {
           // Wait briefly for Safari's storage-backed auth observer.
@@ -1421,7 +1425,7 @@ export default function App() {
   // Never show a blank, local "Admin" dashboard while Firebase has no signed
   // in user. It looks like a real account but cannot contain the user's data.
   // The sign-in screen gives the account boundary an explicit, reliable state.
-  if (firebaseConfigured && needsAuth && !uid && !dataLoading) {
+  if (firebaseConfigured && !uid && !dataLoading) {
     return (
       <main className="auth-gate">
         <section>
