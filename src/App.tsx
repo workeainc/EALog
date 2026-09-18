@@ -364,11 +364,12 @@ export default function App() {
         let redirectResult: any = null;
         try {
           redirectResult = await authSdk.getRedirectResult(auth);
-        } catch (redirectError: any) {
-          // Safari standalone/PWA can clear the temporary redirect
-          // state even though Firebase has already restored the user.
-          // Continue with the persisted auth state in that case.
-          if (redirectError?.code !== "auth/no-auth-event") throw redirectError;
+        } catch {
+          // Google popup is the standard sign-in path. A stale redirect
+          // resolver can fail in Safari/PWA with auth/internal-error even
+          // when the persisted Firebase user is healthy. It is never a
+          // workspace-sync error, so ignore it and restore auth below.
+          redirectResult = null;
         }
         await auth.authStateReady();
         let user = redirectResult?.user || auth.currentUser;
@@ -397,7 +398,7 @@ export default function App() {
         if (!user) {
           setNeedsAuth(true);
           setDataLoading(false);
-          setSyncError("Sign in with Google to open your synced workspace.");
+          setSyncError("");
           return;
         } else if (user.isAnonymous) {
           // Anonymous users are kept local and asked to sign in from
@@ -405,7 +406,7 @@ export default function App() {
           // (Safari blocks those non-gesture popups).
           setNeedsAuth(true);
           setDataLoading(false);
-          setSyncError("Sign in with Google to open your synced workspace.");
+          setSyncError("");
           return;
         }
         if (disposed) return;
@@ -558,8 +559,14 @@ export default function App() {
         setSyncError("");
         setDataLoading(false);
       } catch (error: any) {
-        if (!disposed)
-          setSyncError(error?.message || "Firebase sync could not start.");
+        if (!disposed) {
+          // Authentication restoration errors must never surface as a scary
+          // dashboard warning. The user can sign in again from the profile.
+          if (String(error?.code || "").startsWith("auth/")) {
+            setNeedsAuth(true);
+            setSyncError("");
+          } else setSyncError(error?.message || "Firebase sync could not start.");
+        }
         setDataLoading(false);
       }
     })();
@@ -1348,11 +1355,10 @@ export default function App() {
       setSyncError("");
       window.location.reload();
     } catch (error: any) {
-      setSyncError(
-        error?.code === "auth/popup-blocked"
-          ? "Safari blocked the sign-in popup. Open this site in Safari (not an in-app browser) and tap again."
-          : error?.message || "Could not sign in.",
-      );
+      // Keep sign-in failures local to the compact profile action. They must
+      // never be rendered as a persistent overview warning banner.
+      setNeedsAuth(true);
+      setSyncError("");
     } finally {
       setAuthLoading(false);
     }
@@ -1410,9 +1416,9 @@ export default function App() {
           <div className="avatar">{initials}</div>
           <div>
             <b>{profileName}</b>
-            <small>{authUser?.email || "Personal tracking"}</small>
+            <small>{authUser?.email || (needsAuth ? "Sign in to sync" : "Personal tracking")}</small>
           </div>
-          <ChevronDown size={15} />
+          {needsAuth ? <button className="sidebar-auth-button" onClick={signIn} disabled={authLoading}>{authLoading ? "…" : "Sign in"}</button> : <ChevronDown size={15} />}
         </div>
         <nav>
           <span className="sidebar-group-label">Main</span>
