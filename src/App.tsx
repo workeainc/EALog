@@ -248,6 +248,7 @@ export default function App() {
   const [dataLoading, setDataLoading] = useState(firebaseConfigured);
   const [needsAuth, setNeedsAuth] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [authNotice, setAuthNotice] = useState("");
   const [view, setView] = useState<View>(viewFromLocation);
   const [projectNavOpen, setProjectNavOpen] = useState(true);
   const [lifeNavOpen, setLifeNavOpen] = useState(true);
@@ -1323,6 +1324,7 @@ export default function App() {
     projects.find((project) => project.id === id)?.color || "#8b78e8";
   const signIn = async () => {
     setAuthLoading(true);
+    setAuthNotice("");
     try {
       const [{ auth }, authSdk] = await Promise.all([
         import("./lib/firebase"),
@@ -1339,9 +1341,18 @@ export default function App() {
       try {
         result = await authSdk.signInWithPopup(auth, provider);
       } catch (popupError: any) {
-        if (popupError?.code !== "auth/popup-blocked") throw popupError;
-        await authSdk.signInWithRedirect(auth, provider);
-        return;
+        const code = String(popupError?.code || "");
+        // Safari/PWA can reject otherwise-valid popup auth internally.  A
+        // user-initiated redirect is the reliable fallback in that case.
+        if (["auth/popup-blocked", "auth/internal-error", "auth/cancelled-popup-request"].includes(code)) {
+          try {
+            await authSdk.signInWithRedirect(auth, provider);
+            return;
+          } catch (redirectError: any) {
+            throw redirectError;
+          }
+        }
+        throw popupError;
       }
       setAuthUser({
         displayName:
@@ -1355,10 +1366,14 @@ export default function App() {
       setSyncError("");
       window.location.reload();
     } catch (error: any) {
-      // Keep sign-in failures local to the compact profile action. They must
-      // never be rendered as a persistent overview warning banner.
       setNeedsAuth(true);
       setSyncError("");
+      const code = String(error?.code || "");
+      setAuthNotice(
+        code === "auth/popup-closed-by-user"
+          ? "Google sign-in was closed. Tap Sign in to try again."
+          : "Could not open Google sign-in. Please tap Sign in again.",
+      );
     } finally {
       setAuthLoading(false);
     }
@@ -1416,7 +1431,7 @@ export default function App() {
           <div className="avatar">{initials}</div>
           <div>
             <b>{profileName}</b>
-            <small>{authUser?.email || (needsAuth ? "Sign in to sync" : "Personal tracking")}</small>
+            <small>{authUser?.email || (needsAuth ? authNotice || "Sign in to sync" : "Personal tracking")}</small>
           </div>
           {needsAuth ? <button className="sidebar-auth-button" onClick={signIn} disabled={authLoading}>{authLoading ? "…" : "Sign in"}</button> : <ChevronDown size={15} />}
         </div>
