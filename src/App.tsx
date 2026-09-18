@@ -351,6 +351,38 @@ export default function App() {
   const [editError, setEditError] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Keep the visual account boundary independent from the slower Firestore
+  // bootstrap. Firebase guarantees this observer runs after it resolves its
+  // persisted auth state, so an unauthenticated browser can never remain on a
+  // convincing but empty Admin workspace while another auth promise stalls.
+  useEffect(() => {
+    if (!firebaseConfigured) return;
+    let disposed = false;
+    let unsubscribe = () => {};
+    void (async () => {
+      const [{ auth }, authSdk] = await Promise.all([
+        import("./lib/firebase"),
+        import("firebase/auth"),
+      ]);
+      if (disposed) return;
+      unsubscribe = authSdk.onAuthStateChanged(auth, (user) => {
+        if (disposed || (user && !user.isAnonymous)) return;
+        setNeedsAuth(true);
+        setDataLoading(false);
+        setSyncError("");
+      });
+    })().catch(() => {
+      if (disposed) return;
+      setNeedsAuth(true);
+      setDataLoading(false);
+      setSyncError("");
+    });
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, [firebaseConfigured]);
+
   useEffect(() => {
     if (!firebaseConfigured) return;
     let disposed = false;
