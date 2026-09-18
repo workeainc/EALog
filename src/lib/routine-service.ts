@@ -15,16 +15,41 @@ export const saveRoutine = (uid: string, input: Omit<Routine, "id" | "createdAt"
 export const restoreRoutinePlan = (
   uid: string,
   items: Array<{ id: string; input: Omit<Routine, "id" | "createdAt" | "updatedAt">; exists?: boolean }>,
+  existingRoutines: Routine[] = [],
+  existingLogs: RoutineLog[] = [],
 ) => {
   const batch = writeBatch(db);
+  let removed = 0;
   items.forEach(({ id, input, exists }) => {
     batch.set(doc(routinesRef(uid), id), {
       ...input,
       ...(exists ? {} : { createdAt: serverTimestamp() }),
       updatedAt: serverTimestamp(),
     }, { merge: true });
+    // Old restores used random document ids. Only collapse records that are
+    // an exact match for this default plan item; unrelated custom routines
+    // with a similar name remain untouched.
+    const duplicates = existingRoutines.filter((routine) =>
+      routine.id !== id &&
+      routine.name === input.name &&
+      routine.effectiveDate === input.effectiveDate &&
+      routine.endDate === input.endDate,
+    );
+    duplicates.forEach((duplicate) => {
+      existingLogs.filter((log) => log.routineId === duplicate.id).forEach((log) => {
+        const targetId = `${id}-${log.dateString}`;
+        const targetExists = existingLogs.some((current) => current.id === targetId);
+        if (!targetExists) {
+          const { id: _id, ...data } = log;
+          batch.set(doc(logsRef(uid), targetId), { ...data, routineId: id }, { merge: true });
+        }
+        batch.delete(doc(logsRef(uid), log.id));
+      });
+      batch.delete(doc(routinesRef(uid), duplicate.id));
+      removed += 1;
+    });
   });
-  return batch.commit();
+  return batch.commit().then(() => ({ removed }));
 };
 export const logRoutine = (uid: string, routineId: string, dateString: string, status: RoutineStatus, patch: Partial<RoutineLog> = {}) => setDoc(doc(logsRef(uid), `${routineId}-${dateString}`), {
   routineId,
