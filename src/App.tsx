@@ -1389,6 +1389,11 @@ export default function App() {
       ]);
       await setBestAuthPersistence(auth, authSdk);
       const provider = new authSdk.GoogleAuthProvider();
+      // Early EA Log workspaces may have been created under Firebase's
+      // anonymous identity. Upgrade that exact identity instead of replacing
+      // it with a fresh Google UID, otherwise its private Firestore data would
+      // appear as an empty new workspace after sign-in.
+      const anonymousUser = auth.currentUser?.isAnonymous ? auth.currentUser : null;
       // Use the user-gesture popup on every device. iOS Safari/PWA
       // frequently loses redirect sessionStorage and then returns to the
       // app without the auth result (or shows redirect_uri_mismatch).
@@ -1396,14 +1401,17 @@ export default function App() {
       // browser blocks it, fall back to redirect as a last resort.
       let result;
       try {
-        result = await authSdk.signInWithPopup(auth, provider);
+        result = anonymousUser
+          ? await authSdk.linkWithPopup(anonymousUser, provider)
+          : await authSdk.signInWithPopup(auth, provider);
       } catch (popupError: any) {
         const code = String(popupError?.code || "");
         // Safari/PWA can reject otherwise-valid popup auth internally.  A
         // user-initiated redirect is the reliable fallback in that case.
         if (["auth/popup-blocked", "auth/internal-error", "auth/cancelled-popup-request"].includes(code)) {
           try {
-            await authSdk.signInWithRedirect(auth, provider);
+            if (anonymousUser) await authSdk.linkWithRedirect(anonymousUser, provider);
+            else await authSdk.signInWithRedirect(auth, provider);
             return;
           } catch (redirectError: any) {
             throw redirectError;
@@ -1433,7 +1441,9 @@ export default function App() {
       setAuthNotice(
         code === "auth/popup-closed-by-user"
           ? "Google sign-in was closed. Tap Sign in to try again."
-          : "Could not open Google sign-in. Please tap Sign in again.",
+          : code === "auth/credential-already-in-use"
+            ? "This Google account is already linked to another EA Log workspace."
+            : `Google sign-in did not complete${code ? ` (${code})` : ""}. Please try again.`,
       );
     } finally {
       setAuthLoading(false);
