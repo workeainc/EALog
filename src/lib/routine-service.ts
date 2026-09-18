@@ -1,4 +1,4 @@
-import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, Timestamp, writeBatch, type Unsubscribe } from "firebase/firestore";
+import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, writeBatch, type Unsubscribe } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Routine, RoutineCategory, RoutineLog, RoutineStatus } from "../types/tracker";
 const routinesRef = (uid: string) => collection(db, "users", uid, "routines");
@@ -60,11 +60,3 @@ export const logRoutine = (uid: string, routineId: string, dateString: string, s
   statusChangedAt: serverTimestamp(),
   ...patch,
 }, { merge: true });
-
-/** Recover a past routine without moving it out of the day it was scheduled. */
-export const completeRoutineLate = (uid: string, routineId: string, dateString: string, completedAt: Date, completionNote = "") =>
-  logRoutine(uid, routineId, dateString, "completed", {
-    completionKind: "late",
-    completedAt: Timestamp.fromDate(completedAt),
-    ...(completionNote.trim() ? { completionNote: completionNote.trim() } : {}),
-  });
