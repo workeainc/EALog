@@ -173,6 +173,17 @@ type SyncState = {
   error?: string;
 };
 
+// Browser-local storage is the preferred Firebase session store. Some private
+// browser/PWA contexts reject it, however; keeping the auth flow alive with an
+// in-memory store is better than silently falling back to the demo workspace.
+async function setBestAuthPersistence(auth: any, authSdk: any) {
+  try {
+    await authSdk.setPersistence(auth, authSdk.browserLocalPersistence);
+  } catch {
+    await authSdk.setPersistence(auth, authSdk.inMemoryPersistence);
+  }
+}
+
 export default function App() {
   const firebaseConfigured = Boolean(import.meta.env.VITE_FIREBASE_PROJECT_ID);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -361,7 +372,7 @@ export default function App() {
         // Restore the persisted browser session before deciding whether
         // a new Google sign-in is needed. Without this wait, a refresh
         // can briefly report currentUser as null and reopen the popup.
-        await authSdk.setPersistence(auth, authSdk.browserLocalPersistence);
+        await setBestAuthPersistence(auth, authSdk);
         let redirectResult: any = null;
         try {
           redirectResult = await authSdk.getRedirectResult(auth);
@@ -1330,7 +1341,7 @@ export default function App() {
         import("./lib/firebase"),
         import("firebase/auth"),
       ]);
-      await authSdk.setPersistence(auth, authSdk.browserLocalPersistence);
+      await setBestAuthPersistence(auth, authSdk);
       const provider = new authSdk.GoogleAuthProvider();
       // Use the user-gesture popup on every device. iOS Safari/PWA
       // frequently loses redirect sessionStorage and then returns to the
@@ -1392,6 +1403,26 @@ export default function App() {
       syncState.failed || syncState.pending || syncState.fromCache
     ),
   );
+
+  // Never show a blank, local "Admin" dashboard while Firebase has no signed
+  // in user. It looks like a real account but cannot contain the user's data.
+  // The sign-in screen gives the account boundary an explicit, reliable state.
+  if (firebaseConfigured && needsAuth && !uid && !dataLoading) {
+    return (
+      <main className="auth-gate">
+        <section>
+          <div className="auth-gate-mark"><Activity size={25} /></div>
+          <p className="auth-gate-eyebrow">EA LOG</p>
+          <h1>Sign in to your workspace</h1>
+          <p>Use the Google account that owns your EA Log projects, sessions, and notes.</p>
+          <button type="button" className="start-btn auth-gate-button" onClick={signIn} disabled={authLoading}>
+            {authLoading ? "Opening Google…" : "Continue with Google"}
+          </button>
+          {authNotice && <small role="status">{authNotice}</small>}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className="app-shell">
