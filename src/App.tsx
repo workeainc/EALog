@@ -322,7 +322,9 @@ export default function App() {
         if (log?.status === "completed" || log?.status === "skipped" || log?.status === "missed") continue;
         const snoozedUntil = log?.status === "snoozed" && log.snoozedUntil ? Date.parse(log.snoozedUntil) : NaN;
         const dueAt = Number.isFinite(snoozedUntil) ? new Date(snoozedUntil).getHours() * 60 + new Date(snoozedUntil).getMinutes() : scheduled;
-        if (nowMinutes > scheduled + routine.windowMinutes) {
+        // A snoozed routine has an explicit new due time. Do not mark it
+        // missed using the original schedule before that deferred window ends.
+        if (nowMinutes > dueAt + routine.windowMinutes) {
           const { logRoutine } = await import("./lib/routine-service");
           await logRoutine(uid, routine.id, today, "missed");
           continue;

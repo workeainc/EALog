@@ -1,4 +1,4 @@
-import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, type Unsubscribe } from "firebase/firestore";
+import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, Timestamp, type Unsubscribe } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Routine, RoutineCategory, RoutineLog, RoutineStatus } from "../types/tracker";
 const routinesRef = (uid: string) => collection(db, "users", uid, "routines");
@@ -11,4 +11,20 @@ export const saveRoutine = (uid: string, input: Omit<Routine, "id" | "createdAt"
   { ...input, ...(id ? {} : { createdAt: serverTimestamp() }), updatedAt: serverTimestamp() },
   { merge: true },
 );
-export const logRoutine = (uid: string, routineId: string, dateString: string, status: RoutineStatus, patch: Partial<RoutineLog> = {}) => setDoc(doc(logsRef(uid), `${routineId}-${dateString}`), { routineId, dateString, status, completedAt: status === "completed" ? serverTimestamp() : null, ...patch }, { merge: true });
+export const logRoutine = (uid: string, routineId: string, dateString: string, status: RoutineStatus, patch: Partial<RoutineLog> = {}) => setDoc(doc(logsRef(uid), `${routineId}-${dateString}`), {
+  routineId,
+  dateString,
+  status,
+  completedAt: status === "completed" ? serverTimestamp() : null,
+  ...(status === "completed" ? { completionKind: patch.completionKind || "on_time" } : {}),
+  statusChangedAt: serverTimestamp(),
+  ...patch,
+}, { merge: true });
+
+/** Recover a past routine without moving it out of the day it was scheduled. */
+export const completeRoutineLate = (uid: string, routineId: string, dateString: string, completedAt: Date, completionNote = "") =>
+  logRoutine(uid, routineId, dateString, "completed", {
+    completionKind: "late",
+    completedAt: Timestamp.fromDate(completedAt),
+    ...(completionNote.trim() ? { completionNote: completionNote.trim() } : {}),
+  });

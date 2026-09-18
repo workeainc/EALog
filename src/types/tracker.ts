@@ -33,7 +33,20 @@ export interface FinanceGoal { id: string; name: string; targetAmount: number; a
 export interface RecurringFinanceItem { id: string; type: FinanceTransactionType; amount: number; accountId: string; toAccountId?: string | null; category: string; scope: "personal" | "business"; projectId?: string | null; description: string; dayOfMonth: number; active: boolean; createdAt: Timestamp | null; }
 export interface FinanceBudget { id: string; month: string; category: string; scope: "personal" | "business"; limitAmount: number; createdAt: Timestamp | null; }
 export interface Routine { id: string; name: string; category: RoutineCategory; priority: "critical" | "high" | "normal"; time: string; durationMinutes: number; windowMinutes: number; repeatDays: number[]; reminderMinutes: number; sessionBehavior: "warn" | "pause"; strict: boolean; active: boolean; /** Optional inclusive plan range; omitted routines stay evergreen. */ effectiveDate?: string; endDate?: string; createdAt: Timestamp | null; updatedAt: Timestamp | null; }
-export interface RoutineLog { id: string; routineId: string; dateString: string; status: RoutineStatus; completedAt: Timestamp | null; skippedReason?: string; snoozedUntil?: string; }
+/** A routine log belongs to its scheduled day even when it is recovered later. */
+export interface RoutineLog {
+  id: string;
+  routineId: string;
+  dateString: string;
+  status: RoutineStatus;
+  completedAt: Timestamp | null;
+  /** `late` preserves that the completion happened after its scheduled window. */
+  completionKind?: "on_time" | "late";
+  completionNote?: string;
+  statusChangedAt?: Timestamp | null;
+  skippedReason?: string;
+  snoozedUntil?: string;
+}
 
 export interface Todo {
   id: string;
