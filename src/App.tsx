@@ -524,8 +524,12 @@ export default function App() {
           },
         );
         offNotes = noteService.subscribeToNotes(user.uid, setNotes);
-        offRoutines = routineService.subscribeToRoutines(user.uid, setRoutines);
-        offRoutineLogs = routineService.subscribeToRoutineLogs(user.uid, setRoutineLogs);
+        offRoutines = routineService.subscribeToRoutines(user.uid, setRoutines, (error: Error) => {
+          if (!disposed) setSyncError(error.message || "Routines could not be synced.");
+        });
+        offRoutineLogs = routineService.subscribeToRoutineLogs(user.uid, setRoutineLogs, (error: Error) => {
+          if (!disposed) setSyncError(error.message || "Routine history could not be synced.");
+        });
         offAppMode = subscribeToAppMode(user.uid, setAppMode);
         offFinanceAccounts = financeService.subscribeToFinanceAccounts(user.uid, setFinanceAccounts);
         offFinanceTransactions = financeService.subscribeToFinanceTransactions(user.uid, setFinanceTransactions);

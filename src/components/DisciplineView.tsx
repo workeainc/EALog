@@ -1,6 +1,6 @@
 import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Moon, Pencil, Plus, SkipForward, Sparkles, Sunrise } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { completeRoutineLate, logRoutine, saveRoutine } from "../lib/routine-service";
+import { completeRoutineLate, logRoutine, restoreRoutinePlan, saveRoutine } from "../lib/routine-service";
 import { localDateKey } from "../lib/project-schedule";
 import type { Routine, RoutineCategory, RoutineLog } from "../types/tracker";
 
@@ -28,7 +28,7 @@ export default function DisciplineView({ uid, routines, logs }: Props) {
   const [adding, setAdding] = useState(false); const [editing, setEditing] = useState<Routine | null>(null); const [late, setLate] = useState<Routine | null>(null); const [skipping, setSkipping] = useState<Routine | null>(null);
   const [seeding, setSeeding] = useState(false); const [seedError, setSeedError] = useState("");
   const attemptedSeed = useRef(false);
-  const seedPlan = async () => { if (seeding) return; setSeeding(true); setSeedError(""); try { await Promise.all(allDaysPlan().map((routine) => saveRoutine(uid, routine, routines.find((existing) => existing.name === routine.name)?.id))); } catch (error) { setSeedError(error instanceof Error ? error.message : "Could not add the all-days routine plan."); } finally { setSeeding(false); } };
+  const seedPlan = async () => { if (seeding) return; setSeeding(true); setSeedError(""); try { await restoreRoutinePlan(uid, allDaysPlan().map((routine, index) => { const existing = routines.find((item) => item.name === routine.name); return { id: existing?.id || `discipline-plan-${index + 1}`, input: routine, exists: Boolean(existing) }; })); } catch (error) { setSeedError(error instanceof Error ? error.message : "Could not add the all-days routine plan."); } finally { setSeeding(false); } };
   useEffect(() => { if (attemptedSeed.current || routines.length) return; attemptedSeed.current = true; void seedPlan(); }, [routines.length]);
   const items = useMemo(() => routines.filter((routine) => applicable(routine, date)), [routines, date]);
   const logFor = (routineId: string, day = date) => logs.find((log) => log.routineId === routineId && log.dateString === day);
