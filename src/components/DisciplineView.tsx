@@ -1,5 +1,5 @@
 import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Moon, Pencil, Plus, SkipForward, Sparkles, Sunrise } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { logRoutine, restoreRoutinePlan, saveRoutine } from "../lib/routine-service";
 import { localDateKey } from "../lib/project-schedule";
 import type { Routine, RoutineCategory, RoutineLog } from "../types/tracker";
@@ -27,14 +27,10 @@ export default function DisciplineView({ uid, routines, logs }: Props) {
   const [date, setDate] = useState(today);
   const [adding, setAdding] = useState(false); const [editing, setEditing] = useState<Routine | null>(null); const [skipping, setSkipping] = useState<Routine | null>(null);
   const [seeding, setSeeding] = useState(false); const [seedError, setSeedError] = useState(""); const [seedNotice, setSeedNotice] = useState("");
-  const attemptedSeed = useRef(false);
   const defaultPlan = allDaysPlan();
   const planReady = defaultPlan.every((routine, index) => routines.some((item) => item.id === `discipline-plan-${index + 1}`));
   const duplicateCount = defaultPlan.reduce((count, routine) => count + Math.max(0, routines.filter((item) => item.name === routine.name && item.effectiveDate === routine.effectiveDate && item.endDate === routine.endDate).length - 1), 0);
-  const normalizedPlan = useRef(false);
   const seedPlan = async () => { if (seeding) return; setSeeding(true); setSeedError(""); setSeedNotice(""); try { const result = await restoreRoutinePlan(uid, defaultPlan.map((routine, index) => ({ id: `discipline-plan-${index + 1}`, input: routine, exists: routines.some((item) => item.id === `discipline-plan-${index + 1}`) })), routines, logs); setSeedNotice(result.removed ? `${result.removed} duplicate routines were cleaned up.` : "All-days routine plan is ready."); } catch (error) { setSeedError(error instanceof Error ? error.message : "Could not add the all-days routine plan."); } finally { setSeeding(false); } };
-  useEffect(() => { if (attemptedSeed.current || routines.length) return; attemptedSeed.current = true; void seedPlan(); }, [routines.length]);
-  useEffect(() => { if (!routines.length || normalizedPlan.current) return; normalizedPlan.current = true; if (!planReady || duplicateCount) void seedPlan(); }, [routines, planReady, duplicateCount]);
   const items = useMemo(() => routines.filter((routine) => applicable(routine, date)), [routines, date]);
   const logFor = (routineId: string, day = date) => logs.find((log) => log.routineId === routineId && log.dateString === day);
   const statusFor = (routine: Routine, day = date) => logFor(routine.id, day)?.status || (day < today ? "missed" : "planned");
