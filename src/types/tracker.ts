@@ -45,6 +45,8 @@ export interface RoutineLog {
   completionNote?: string;
   statusChangedAt?: Timestamp | null;
   skippedReason?: string;
+  /** Set only when the user explicitly marks a routine as missed. */
+  manuallyMarkedMissed?: boolean;
   snoozedUntil?: string;
 }
 
