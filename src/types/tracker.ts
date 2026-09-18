@@ -47,6 +47,8 @@ export interface RoutineLog {
   skippedReason?: string;
   /** Set only when the user explicitly marks a routine as missed. */
   manuallyMarkedMissed?: boolean;
+  /** The routine time whose advance warning the user has already dismissed. */
+  warningAcknowledgedFor?: string;
   snoozedUntil?: string;
 }
 

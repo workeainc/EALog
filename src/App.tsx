@@ -239,6 +239,11 @@ export default function App() {
   const [routineLogs, setRoutineLogs] = useState<RoutineLog[]>([]);
   const [dueRoutine, setDueRoutine] = useState<Routine | null>(null);
   const [routineWarning, setRoutineWarning] = useState<Routine | null>(null);
+  const [routinePausedWork, setRoutinePausedWork] = useState(false);
+  const [routineActionBusy, setRoutineActionBusy] = useState(false);
+  const [routineActionError, setRoutineActionError] = useState("");
+  const routineWarningDismissalsRef = useRef(new Set<string>());
+  const routineDueHandledRef = useRef(new Set<string>());
   const [appMode, setAppMode] = useState<AppModeState>(WORKDAY_MODE);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
   const [financeTransactions, setFinanceTransactions] = useState<FinanceTransaction[]>([]);
@@ -325,15 +330,26 @@ export default function App() {
         // A snoozed routine has an explicit new due time. Do not mark it
         // missed using the original schedule before that deferred window ends.
         if (nowMinutes > dueAt + routine.windowMinutes) {
-          const { logRoutine } = await import("./lib/routine-service");
-          await logRoutine(uid, routine.id, today, "missed");
+          const occurrenceKey = `${routine.id}-${today}`;
+          if (!routineDueHandledRef.current.has(occurrenceKey)) {
+            routineDueHandledRef.current.add(occurrenceKey);
+            try { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, routine.id, today, "missed"); }
+            catch (error: any) { routineDueHandledRef.current.delete(occurrenceKey); setSyncError(error?.message || "Could not save the missed routine."); }
+          }
           continue;
         }
-        if (nowMinutes >= dueAt && !dueRoutine) {
-          if ((routine.priority === "critical" || routine.priority === "high" || routine.sessionBehavior === "pause") && running && !paused && tracker) await tracker.pauseSession(uid);
-          setRoutineWarning(null); setDueRoutine(routine); return;
+        const occurrenceKey = `${routine.id}-${today}`;
+        if (nowMinutes >= dueAt && !dueRoutine && !routineDueHandledRef.current.has(occurrenceKey)) {
+          routineDueHandledRef.current.add(occurrenceKey);
+          const shouldPause = (routine.priority === "critical" || routine.priority === "high" || routine.sessionBehavior === "pause") && running && !paused && tracker;
+          if (shouldPause) {
+            try { await tracker.pauseSession(uid); }
+            catch (error: any) { routineDueHandledRef.current.delete(occurrenceKey); setSyncError(error?.message || "Could not pause your work session for this routine."); return; }
+          }
+          setRoutineActionError(""); setRoutinePausedWork(Boolean(shouldPause)); setRoutineWarning(null); setDueRoutine(routine); return;
         }
-        if (nowMinutes >= scheduled - routine.reminderMinutes && nowMinutes < scheduled && !routineWarning && !dueRoutine) setRoutineWarning(routine);
+        const warningKey = `${occurrenceKey}-${routine.time}`;
+        if (nowMinutes >= scheduled - routine.reminderMinutes && nowMinutes < scheduled && !routineWarning && !dueRoutine && !routineWarningDismissalsRef.current.has(warningKey) && log?.warningAcknowledgedFor !== routine.time) setRoutineWarning(routine);
       }
     };
     void check(); const interval = window.setInterval(() => void check(), 30000); return () => window.clearInterval(interval);
@@ -949,6 +965,34 @@ export default function App() {
     } catch (error: any) {
       setSyncError(error?.message || "Could not resume session.");
     }
+  };
+  const acknowledgeRoutineWarning = async (pauseWork: boolean) => {
+    if (!uid || !routineWarning || routineActionBusy) return;
+    setRoutineActionBusy(true); setRoutineActionError("");
+    const warningKey = `${routineWarning.id}-${localDateKey()}-${routineWarning.time}`;
+    routineWarningDismissalsRef.current.add(warningKey);
+    try {
+      if (pauseWork && running && !paused && tracker) await tracker.pauseSession(uid);
+      const { logRoutine } = await import("./lib/routine-service");
+      await logRoutine(uid, routineWarning.id, localDateKey(), "planned", { warningAcknowledgedFor: routineWarning.time });
+      setRoutineWarning(null);
+    } catch (error: any) {
+      routineWarningDismissalsRef.current.delete(warningKey);
+      setRoutineActionError(error?.message || "This routine action could not be saved. Please try again.");
+    } finally { setRoutineActionBusy(false); }
+  };
+  const resolveDueRoutine = async (status: "completed" | "missed" | "snoozed") => {
+    if (!uid || !dueRoutine || routineActionBusy) return;
+    setRoutineActionBusy(true); setRoutineActionError("");
+    try {
+      const { logRoutine } = await import("./lib/routine-service");
+      const occurrenceKey = `${dueRoutine.id}-${localDateKey()}`;
+      await logRoutine(uid, dueRoutine.id, localDateKey(), status, status === "snoozed" ? { snoozedUntil: new Date(Date.now() + 10 * 60 * 1000).toISOString() } : status === "missed" ? { manuallyMarkedMissed: true } : {});
+      if (status === "snoozed") routineDueHandledRef.current.delete(occurrenceKey);
+      setDueRoutine(null); setRoutinePausedWork(false);
+    } catch (error: any) {
+      setRoutineActionError(error?.message || "This routine action could not be saved. Please try again.");
+    } finally { setRoutineActionBusy(false); }
   };
   const startBreak = async (minutes: number, reason: string) => {
     if (vacationActive) throw new Error("Vacation mode is active.");
@@ -2071,8 +2115,8 @@ export default function App() {
           </>
         )}
       </main>
-      {routineWarning && uid && <div className="modal-backdrop routine-due-modal"><section className="note-modal"><div className="modal-icon"><Bell size={20}/></div><span className="eyebrow">UPCOMING ROUTINE</span><h3>{routineWarning.name}</h3><p>Your {routineWarning.time} commitment starts soon. Wrap up or pause your current focus session before it is due.</p><div className="routine-due-actions"><button className="outline-btn" onClick={() => setRoutineWarning(null)}>Continue working</button><button className="start-btn" onClick={async () => { if (uid && running && !paused && tracker) await tracker.pauseSession(uid); setRoutineWarning(null); }}>Pause now</button></div></section></div>}
-      {dueRoutine && uid && <div className="modal-backdrop routine-due-modal"><section className="note-modal"><div className="modal-icon"><Sparkles size={20}/></div><span className="eyebrow">SCHEDULED ROUTINE</span><h3>{dueRoutine.name}</h3><p>It is {dueRoutine.time}. {(dueRoutine.priority === "critical" || dueRoutine.priority === "high" || dueRoutine.sessionBehavior === "pause") && running ? "Your active work session was paused." : "Take this time for your commitment."}</p><div className="routine-due-actions"><button className="outline-btn" onClick={async () => { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "snoozed", { snoozedUntil: new Date(Date.now() + 10 * 60 * 1000).toISOString() }); setDueRoutine(null); }}>Snooze 10 min</button><button className="outline-btn" onClick={async () => { if (dueRoutine.priority === "critical") { const reason = window.prompt("Why are you skipping this critical routine?"); if (!reason?.trim()) return; const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "skipped", { skippedReason: reason.trim() }); } else { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "skipped"); } setDueRoutine(null); }}>Skip</button><button className="start-btn" onClick={async () => { const { logRoutine } = await import("./lib/routine-service"); await logRoutine(uid, dueRoutine.id, localDateKey(), "completed"); setDueRoutine(null); }}>Complete routine</button></div></section></div>}
+      {routineWarning && uid && <div className="modal-backdrop routine-due-modal"><section className="note-modal"><div className="modal-icon"><Bell size={20}/></div><span className="eyebrow">UPCOMING ROUTINE</span><h3>{routineWarning.name}</h3><p>Your {routineWarning.time} commitment starts soon. You can keep working until it is due, or pause now.</p>{routineActionError && <p className="routine-action-error" role="alert">{routineActionError}</p>}<div className="routine-due-actions"><button className="outline-btn" disabled={routineActionBusy} onClick={() => void acknowledgeRoutineWarning(false)}>{routineActionBusy ? "Saving…" : "Continue working"}</button><button className="start-btn" disabled={routineActionBusy} onClick={() => void acknowledgeRoutineWarning(true)}>{routineActionBusy ? "Saving…" : "Pause now"}</button></div></section></div>}
+      {dueRoutine && uid && <div className="modal-backdrop routine-due-modal"><section className="note-modal"><div className="modal-icon"><Sparkles size={20}/></div><span className="eyebrow">SCHEDULED ROUTINE</span><h3>{dueRoutine.name}</h3><p>It is {dueRoutine.time}. {routinePausedWork ? "Your work session is paused. Complete or mark this routine missed, then use Resume work when you are ready." : "Choose how this routine went."}</p>{routineActionError && <p className="routine-action-error" role="alert">{routineActionError}</p>}<div className="routine-due-actions"><button className="outline-btn" disabled={routineActionBusy} onClick={() => void resolveDueRoutine("snoozed")}>Snooze 10 min</button><button className="outline-btn routine-missed-action" disabled={routineActionBusy} onClick={() => void resolveDueRoutine("missed")}>Mark missed</button><button className="start-btn" disabled={routineActionBusy} onClick={() => void resolveDueRoutine("completed")}>{routineActionBusy ? "Saving…" : "Complete routine"}</button></div></section></div>}
       {editingLog && (
         <div className="modal-backdrop" role="presentation">
           <form
