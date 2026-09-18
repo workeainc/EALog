@@ -173,15 +173,24 @@ type SyncState = {
   error?: string;
 };
 
-// Browser-local storage is the preferred Firebase session store. Some private
-// browser/PWA contexts reject it, however; keeping the auth flow alive with an
-// in-memory store is better than silently falling back to the demo workspace.
+// Browser-local storage is preferred. In a restrictive PWA/private context it
+// can be unavailable, so retain the session in browser-session storage before
+// considering memory-only auth. The latter must never be followed by a reload.
 async function setBestAuthPersistence(auth: any, authSdk: any) {
-  try {
-    await authSdk.setPersistence(auth, authSdk.browserLocalPersistence);
-  } catch {
-    await authSdk.setPersistence(auth, authSdk.inMemoryPersistence);
+  const options = [
+    authSdk.browserLocalPersistence,
+    authSdk.browserSessionPersistence,
+    authSdk.inMemoryPersistence,
+  ];
+  for (const persistence of options) {
+    try {
+      await authSdk.setPersistence(auth, persistence);
+      return persistence;
+    } catch {
+      // Try the next safe option for this browser context.
+    }
   }
+  throw new Error("Firebase session storage is unavailable.");
 }
 
 export default function App() {
@@ -260,6 +269,7 @@ export default function App() {
   const [needsAuth, setNeedsAuth] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [authNotice, setAuthNotice] = useState("");
+  const [authEpoch, setAuthEpoch] = useState(0);
   const [view, setView] = useState<View>(viewFromLocation);
   const [projectNavOpen, setProjectNavOpen] = useState(true);
   const [lifeNavOpen, setLifeNavOpen] = useState(true);
@@ -599,7 +609,7 @@ export default function App() {
       offFinanceBudgets();
       todoUnsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, [firebaseConfigured]);
+  }, [firebaseConfigured, authEpoch]);
   useEffect(() => {
     if (!firebaseConfigured || !uid || !tracker) {
       setSyncState(null);
@@ -1375,7 +1385,11 @@ export default function App() {
       });
       setNeedsAuth(false);
       setSyncError("");
-      window.location.reload();
+      // Do not reload after a popup result. Some standalone PWAs only permit
+      // Firebase's memory persistence, and a reload would erase an otherwise
+      // successful login before the workspace listeners can attach.
+      setDataLoading(true);
+      setAuthEpoch((current) => current + 1);
     } catch (error: any) {
       setNeedsAuth(true);
       setSyncError("");
